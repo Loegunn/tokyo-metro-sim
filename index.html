@@ -265,7 +265,8 @@ const EN={'中央線':'the Chuo Line','京浜東北線':'the Keihin-Tohoku Line'
 '宇都宮線・高崎線':'the Utsunomiya and Takasaki Lines','東北新幹線':'the Tohoku Shinkansen',
 'つくばエクスプレス':'the Tsukuba Express','山手線':'the Yamanote Line',
 '東武スカイツリーライン':'the Tobu Skytree Line',
-'武蔵野線':'the Musashino Line','東葉高速線':'the Toyo Rapid Line'};
+'武蔵野線':'the Musashino Line','東葉高速線':'the Toyo Rapid Line',
+'西武有楽町線':'the Seibu Yurakucho Line'};
 const YAMANOTE_STATIONS=[
 ['01','東京','とうきょう','Tokyo',[['中央線',C.chuo],['京浜東北線',C.keihin],['東海道線',C.tokaido],['横須賀線',C.yokosuka],['京葉線',C.keiyo],['東海道新幹線',C.shkT],['丸ノ内線',C.maru]],['L','L']],
 ['02','有楽町','ゆうらくちょう','Yūrakuchō',[['京浜東北線',C.keihin],['有楽町線',C.yuraku],['日比谷線',C.hibiya]],['L','L']],
@@ -400,6 +401,44 @@ const TOZAI_STATIONS=[
 ['23','西船橋','にしふなばし','Nishi-funabashi',[['中央・総武線',C.sobu],['武蔵野線',C.musashino],['東葉高速線',C.toyokosoku]],['LR','LR']]
 ].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
 
+/* ═══ 有楽町線（Y01～Y24，和光市⇔新木場，直線來回，第五條線）═══
+   官方編號同排序已經對住 tokyometro.jp 官網路線總覽頁（line_yurakucho/index.html）
+   核實過，仲逐個站Fetch咗和光市／池袋／飯田橋／市ケ谷／東池袋／永田町／月島呢幾個
+   轉乘關係比較複雜嘅站個別官方頁面做交叉核對（例如證實咗和光市其實冇JR轉乘，
+   東池袋官方冇列都營大江戸線嘅轉乘——雖然地理上有個同名嘅都營站，但官方冇認呢個
+   轉乘，所以跟返保守原則冇加）。永田町官方頁面列明「のりかえ駅 赤坂見附駅」，即係
+   同銀座線／丸ノ内線嗰種「唔同站名但官方認做轉乘」嘅安排一樣。JR方面，官方頁面
+   淨係寫「JR線」冇講邊條，池袋／飯田橋／市ケ谷／有楽町／新木場呢幾個站嘅具體JR
+   線名係跟返其他線嘅車站資料（例如山手線自己個池袋entry）交叉比對出嚟，唔係
+   官方呢頁講明。開門方向：**用戶未提供資料，全部24個站暫時標null（未確認）**，
+   跟返之前加線嘅慣例，唔會亂估。 */
+const YURAKUCHO_STATIONS=[
+['01','和光市','わこうし','Wakoshi',[['東武東上線',C.tobu],['副都心線',C.fuku]],[null,null]],
+['02','地下鉄成増','ちかてつなります','Chikatetsu-narimasu',[],[null,null]],
+['03','地下鉄赤塚','ちかてつあかつか','Chikatetsu-akatsuka',[],[null,null]],
+['04','平和台','へいわだい','Heiwadai',[],[null,null]],
+['05','氷川台','ひかわだい','Hikawadai',[],[null,null]],
+['06','小竹向原','こたけむかいはら','Kotake-mukaihara',[['西武有楽町線',C.seibu],['副都心線',C.fuku]],[null,null]],
+['07','千川','せんかわ','Senkawa',[],[null,null]],
+['08','要町','かなめちょう','Kanamecho',[],[null,null]],
+['09','池袋','いけぶくろ','Ikebukuro',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['丸ノ内線',C.maru],['副都心線',C.fuku],['西武池袋線',C.seibu],['東武東上線',C.tobu]],[null,null]],
+['10','東池袋','ひがしいけぶくろ','Higashi-ikebukuro',[],[null,null]],
+['11','護国寺','ごこくじ','Gokokuji',[],[null,null]],
+['12','江戸川橋','えどがわばし','Edogawabashi',[],[null,null]],
+['13','飯田橋','いいだばし','Iidabashi',[['東西線',C.tozai],['南北線',C.namboku],['都営大江戸線',C.oedo],['中央・総武線',C.sobu]],[null,null]],
+['14','市ケ谷','いちがや','Ichigaya',[['南北線',C.namboku],['都営新宿線',C.shinjukuS],['中央・総武線',C.sobu]],[null,null]],
+['15','麹町','こうじまち','Kojimachi',[],[null,null]],
+['16','永田町','ながたちょう','Nagatacho',[['半蔵門線',C.hanzo],['南北線',C.namboku],['銀座線',C.ginza],['丸ノ内線',C.maru]],[null,null]],
+['17','桜田門','さくらだもん','Sakuradamon',[],[null,null]],
+['18','有楽町','ゆうらくちょう','Yurakucho',[['日比谷線',C.hibiya],['千代田線',C.chiyoda],['都営三田線',C.mita],['山手線',C.yamanote],['京浜東北線',C.keihin]],[null,null]],
+['19','銀座一丁目','ぎんざいっちょうめ','Ginza-itchome',[['銀座線',C.ginza],['丸ノ内線',C.maru],['日比谷線',C.hibiya]],[null,null]],
+['20','新富町','しんとみちょう','Shintomicho',[['日比谷線',C.hibiya]],[null,null]],
+['21','月島','つきしま','Tsukishima',[['都営大江戸線',C.oedo]],[null,null]],
+['22','豊洲','とよす','Toyosu',[['ゆりかもめ',C.yurika]],[null,null]],
+['23','辰巳','たつみ','Tatsumi',[],[null,null]],
+['24','新木場','しんきば','Shin-kiba',[['京葉線',C.keiyo],['りんかい線',C.rinkai]],[null,null]]
+].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
+
 /* ═══ 路線總表：每條線嘅色系／徽章／拓撲／方向標籤／footnote ═══ */
 const LINES={
   yamanote:{
@@ -429,6 +468,13 @@ const LINES={
     dirLabels:['西船橋方面','中野方面'],
     stations:TOZAI_STATIONS,
     footnote:'<b>開門方向</b>資料由用戶提供整理；中野、妙典、西船橋因為多股道／終點交替月台等原因，兩個方向都標「左／右皆有可能」；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅先會列入去；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
+  },
+  yuraku:{
+    id:'yuraku', name:'有楽町線', badge:'Y', topology:'linear',
+    color:'#C1A470', colorDeep:'#8B6F3E',
+    dirLabels:['新木場方面','和光市方面'],
+    stations:YURAKUCHO_STATIONS,
+    footnote:'<b>開門方向</b>資料仲未有，全部站暫時標「未確認」，唔會亂估；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅先會列入去（例如永田町↔赤坂見附呢種官方認做同一組轉乘嘅唔同站名安排）；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
   }
 };
 let CUR=LINES.yamanote;
@@ -457,6 +503,19 @@ function order(){
   return seq;
 }
 const at=i=>{ const o=order(); return o[((i%o.length)+o.length)%o.length]; };
+/* 直線來回路線行到終點會自動掉頭，但`outer`呢個「初始方向選擇」本身唔會變。
+   開門邊、方向標籤、報站呢啲要跟返「宜家實際行緊去程定返程」先啱，唔可以
+   淨係睇住冇更新過嘅`outer`——呢個正正就係之前個bug嘅根源。
+   effOuter(i) 算返喺idx=i嗰陣，實際仲係咪同當初`outer`揀嗰個方向一致
+   （true＝一致，用返door[1]／dirLabels[0]；false＝已經掉咗轉頭，
+   要用door[0]／dirLabels[1]）。環狀路線（山手線）冇呢種「來回」結構，
+   直接原封不動返返`outer`。 */
+function effOuter(i){
+  if(CUR.topology!=='linear') return outer;
+  const N=S.length, per=Math.max(2*(N-1),1);
+  const m=((i%per)+per)%per;
+  return (m<=N-1)===outer;
+}
 
 /* ═══════════ 音響 ═══════════ */
 let ac=null,sfx=null,nBuf=null,built=false,greeted=false;
@@ -592,6 +651,8 @@ const doorAir=()=>noiseBurst(0,.45,.07,3400,.7,'highpass');
    分頁隱藏）一律用 stopSpeech()，唔經呢個排隊邏輯。 */
 let queue=[], liveUtterances=[], speaking=false;
 function stopSpeech(){
+  genId++; // 令啱啱排緊隊、仲未播出嚟嘅delayed announce()即刻作廢，
+           // 唔會夠鐘先喺已經暫停／靜音／收埋分頁之後先蹦出嚟
   queue=[]; speaking=false;
   if(window.speechSynthesis) speechSynthesis.cancel();
 }
@@ -640,8 +701,8 @@ function strip(){
 }
 
 /* ═══ 表示 ═══ */
-function doorSideText(st){
-  const side = outer ? st.door[1] : st.door[0];
+function doorSideText(st,i){
+  const side = effOuter(i) ? st.door[1] : st.door[0];
   if(side==='L') return {cls:'', html:'<b>◀ 左側</b>ドアが開きます', side};
   if(side==='R') return {cls:'', html:'<b>右側 ▶</b>ドアが開きます', side};
   if(side==='R?') return {cls:'unknown', html:'<b>右側 ▶</b>（一般，實際睇當日月台）', side};
@@ -662,6 +723,7 @@ function paintDoorHighlight(side){
   dR.classList.toggle('flash', flashing && hiR);
 }
 function paint(){
+  setDirLabel(); // 直線來回路線掉頭後方向會變，每次畫面更新都要重新check
   const stopped=phase==='open'||phase==='dwell'||phase==='close';
   const cur=stopped?at(idx+1):at(idx), nx=stopped?at(idx+2):at(idx+1);
   const focus=stopped?cur:nx;
@@ -679,7 +741,7 @@ function paint(){
   if(!focus.tf.length) L.innerHTML='<span class="tf-none">のりかえはありません</span>';
   else focus.tf.forEach(([n,c])=>{const s=document.createElement('span');
     s.className='chip'; s.style.setProperty('--c',c); s.textContent=n; L.appendChild(s);});
-  const ds=doorSideText(focus), dEl=$('dSide');
+  const ds=doorSideText(focus, idx+1), dEl=$('dSide');
   dEl.className='d-side '+ds.cls; dEl.innerHTML=ds.html;
   paintDoorHighlight(ds.side);
 }
@@ -708,7 +770,7 @@ function enter(p){
   }
   const n=at(idx+1);
   const enTf=n.tf.map(x=>EN[x[0]]).filter(Boolean).slice(0,3);
-  const side = outer ? n.door[1] : n.door[0];
+  const side = effOuter(idx+1) ? n.door[1] : n.door[0];
   const sideJp = side==='L' ? '左側の' : side==='R' ? '右側の' : '';
   const sideEn = side==='L' ? ' on the left side' : side==='R' ? ' on the right side' : '';
   if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
@@ -768,7 +830,7 @@ function loop(now){
 }
 
 /* ═══ 操作 ═══ */
-function setDirLabel(){ $('dirLabel').textContent=CUR.dirLabels[outer?0:1]; }
+function setDirLabel(){ $('dirLabel').textContent=CUR.dirLabels[effOuter(idx+1)?0:1]; }
 function buildDirSeg(){
   let html=`<button data-dir="out" aria-pressed="true">${CUR.dirLabels[0]}</button>`+
            `<button data-dir="in" aria-pressed="false">${CUR.dirLabels[1]}</button>`;
