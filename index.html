@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>東京地下鉄 車内案内ディスプレイ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --uguisu:#9ACD32;--uguisu-deep:#5E8A0E;--ink:#15171A;--soft:#5A6068;--paper:#fff;
+  --room:#DFE0DB;--rule:#D8DAD4;--plate:#2B2F35;--alert:#C0392B;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--room);color:var(--ink);
+  font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",
+              "Microsoft JhengHei",system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.unit{position:relative;width:min(1020px,100%);background:var(--paper);border-radius:6px;
+  box-shadow:0 18px 44px -26px rgba(0,0,0,.55);overflow:hidden}
+.unit.passenger{width:100vw;max-width:100vw}
+.unit.passenger .ctl,.unit.passenger .audio{display:none}
+.passenger-toggle{position:absolute;top:9px;right:9px;z-index:10;width:30px;height:30px;
+  border-radius:50%;background:rgba(0,0,0,.28);color:#fff;border:none;font-size:14px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;
+  transition:opacity .2s;padding:0}
+.passenger-toggle:hover,.passenger-toggle:focus-visible{opacity:1}
+
+.bar{background:var(--uguisu);display:flex;align-items:center;gap:13px;padding:9px 18px}
+.jy{width:29px;height:29px;border-radius:50%;background:#fff;color:var(--uguisu-deep);
+  display:grid;place-items:center;font-weight:900;font-size:12.5px;flex:0 0 auto}
+.bar-line{font-weight:900;font-size:16px;color:#1F2A05;letter-spacing:.06em;white-space:nowrap}
+.bar-dir{margin-left:auto;font-weight:700;font-size:13px;color:#2B3A08;
+  background:rgba(255,255,255,.55);padding:4px 12px;border-radius:2px;letter-spacing:.08em;
+  white-space:nowrap;flex:0 0 auto}
+
+/* ── 主表示：長站名保護 ── */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 236px}
+.next{padding:22px 24px 16px;min-width:0;overflow:hidden}
+.eyebrow{font-size:14px;font-weight:700;letter-spacing:.5em;color:var(--soft);height:21px}
+.eyebrow.hot{color:var(--alert)}
+.row{display:flex;align-items:flex-start;gap:16px;min-width:0}
+.name-wrap{min-width:0;flex:1 1 auto;overflow:hidden}
+.name{
+  font-weight:900;line-height:1.02;
+  font-size:clamp(30px,7.4vw,74px);
+  letter-spacing:.05em;margin:3px 0 6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:100%;
+}
+.read{display:flex;align-items:baseline;gap:13px;flex-wrap:nowrap;min-width:0;overflow:hidden}
+.kana{font-size:14px;color:var(--soft);letter-spacing:.24em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.romaji{font-size:16px;font-weight:500;letter-spacing:.09em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto}
+.plate{flex:0 0 auto;text-align:center;border:3px solid var(--plate);border-radius:6px;
+  padding:5px 9px 6px;min-width:70px;margin-top:4px}
+.plate .l{font-size:11px;font-weight:900;color:var(--uguisu-deep);letter-spacing:.1em}
+.plate .n{font-size:24px;font-weight:900;line-height:1;margin-top:1px}
+
+.here{border-left:1px solid var(--rule);background:#F8F9F6;padding:18px 18px 14px;
+  display:flex;flex-direction:column;gap:3px;min-width:0;overflow:hidden}
+.here .cap{font-size:10.5px;font-weight:700;letter-spacing:.24em;color:var(--soft)}
+.here .h-name{font-size:31px;font-weight:900;letter-spacing:.04em;line-height:1.1;margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.here .h-rom{font-size:12px;color:var(--soft);letter-spacing:.06em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.door{margin-top:auto;padding-top:12px;display:flex;align-items:center;gap:10px}
+.d-txt{font-size:11.5px;font-weight:700;color:var(--soft);line-height:1.4}
+.d-txt.open{color:var(--alert)}
+.d-side{font-size:10.5px;color:var(--soft);margin-top:2px;font-weight:500}
+.d-side b{color:var(--uguisu-deep);font-weight:900}
+.d-side.unknown{color:#AEB4B8;font-style:italic}
+#dL,#dR{transition:fill .25s}
+#dL.hi,#dR.hi{fill:var(--uguisu-deep);opacity:.5}
+#dL.flash,#dR.flash{opacity:1;animation:doorPulse 1s ease-in-out infinite}
+@keyframes doorPulse{0%,100%{fill:var(--uguisu-deep)}50%{fill:var(--uguisu)}}
+@media (prefers-reduced-motion:reduce){
+  #dL.flash,#dR.flash{animation:none;opacity:1;fill:var(--uguisu-deep)}
+}
+
+.tf{padding:0 24px 18px;display:flex;gap:11px;align-items:flex-start;min-height:36px}
+.tf-cap{font-size:10.5px;font-weight:700;color:var(--soft);letter-spacing:.14em;
+  padding-top:5px;flex:0 0 auto;white-space:nowrap}
+.tf-list{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.chip{font-size:12px;padding:3px 9px 4px;border-radius:2px;background:#F2F3EF;
+  border-left:5px solid var(--c,#999);white-space:nowrap}
+.tf-none{font-size:12px;color:#A7ADB2;padding-top:5px}
+
+.map{border-top:1px solid var(--rule);background:linear-gradient(#FAFBF8,#F0F2ED);
+  padding:18px 0 6px;overflow:hidden;position:relative}
+.map::before,.map::after{content:"";position:absolute;top:0;bottom:0;width:60px;z-index:3}
+.map::before{left:0;background:linear-gradient(90deg,#F4F5F1,transparent)}
+.map::after{right:0;background:linear-gradient(-90deg,#F4F5F1,transparent)}
+.rail{position:relative;height:92px;will-change:transform}
+.track{position:absolute;top:25px;height:8px;background:var(--uguisu);border-radius:4px}
+.stop{position:absolute;top:0;transform:translateX(-50%);text-align:center;width:100px;overflow:hidden}
+.dot{width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--uguisu-deep);
+  margin:23px auto 0;position:relative;z-index:2}
+.stop.on .dot{background:var(--plate);border-color:var(--plate);transform:scale(1.25)}
+.s-name{font-size:11.5px;font-weight:700;margin-top:7px;color:var(--soft);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.stop.on .s-name{color:var(--ink)}
+.s-no{font-size:9px;color:#AEB4B8;margin-top:1px}
+.train{position:absolute;top:-3px;z-index:4;transform:translateX(-50%)}
+.train svg{display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,.28))}
+
+.audio{display:flex;align-items:center;gap:11px;padding:11px 18px;
+  background:#EEF3E2;border-top:1px solid var(--rule)}
+.audio.live{background:#F7F8F5}
+.audio .st{font-size:11.5px;color:var(--soft);line-height:1.5}
+.audio .st b{color:var(--uguisu-deep)}
+.audio .st.bad b{color:var(--alert)}
+#btnSound{background:var(--uguisu-deep);border-color:var(--uguisu-deep);color:#fff;
+  padding:8px 16px;font-size:13.5px;flex:0 0 auto}
+.audio.live #btnSound{background:#fff;border-color:#C9CCC4;color:var(--ink)}
+
+.ctl{border-top:1px solid var(--rule);background:#F7F8F5;padding:12px 18px;
+  display:flex;gap:15px;align-items:center;flex-wrap:wrap}
+.grp{display:flex;gap:7px;align-items:center}
+.lbl{font-size:10.5px;font-weight:700;color:var(--soft);letter-spacing:.12em}
+button,select{font:inherit;font-size:13px;font-weight:700;border:1px solid #C9CCC4;
+  background:#fff;color:var(--ink);padding:6px 12px;border-radius:3px;cursor:pointer}
+select{font-weight:500;padding:6px 8px}
+button:hover,select:hover{border-color:var(--uguisu-deep)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--uguisu);outline-offset:2px}
+button[aria-pressed="true"],button.on{background:var(--uguisu-deep);border-color:var(--uguisu-deep);color:#fff}
+.seg{display:flex}
+.seg button{border-radius:0;margin-left:-1px;padding:6px 11px}
+.seg button:first-child{border-radius:3px 0 0 3px;margin-left:0}
+.seg button:last-child{border-radius:0 3px 3px 0}
+input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
+.note{padding:8px 18px 15px;font-size:10.5px;color:#8A9096;line-height:1.6;background:#F7F8F5}
+.note b{color:var(--uguisu-deep)}
+
+@media (max-width:760px){
+  body{padding:0}.unit{border-radius:0}
+  .main{grid-template-columns:1fr}
+  .here{border-left:0;border-top:1px solid var(--rule);flex-direction:row;align-items:center;
+    gap:14px;padding:12px 16px}
+  .here .h-name{font-size:22px;margin:0}.here .h-rom{display:none}
+  .door{margin:0 0 0 auto;padding:0;flex-direction:column;align-items:flex-end;gap:2px}
+  .next{padding:18px 16px 12px}.tf{padding:0 16px 14px}
+  .eyebrow{letter-spacing:.3em;font-size:12.5px}
+  .ctl,.audio{padding:10px 12px;gap:10px}
+  .name{font-size:clamp(26px,8vw,44px)}
+}
+@media (prefers-reduced-motion:reduce){.stop.on .dot{transform:none}}
+</style>
+</head>
+<body>
+<div class="unit">
+  <button class="passenger-toggle" id="btnPassenger" title="乘客模式（隱藏控制項，全螢幕顯示）">⛶</button>
+  <div class="bar">
+    <div class="jy" id="jyBadge">JY</div><div class="bar-line" id="lineName">山手線</div>
+    <div class="bar-dir" id="dirLabel">外回り</div>
+  </div>
+
+  <div class="main">
+    <div class="next">
+      <div class="eyebrow" id="eyebrow">つぎは</div>
+      <div class="row">
+        <div class="name-wrap">
+          <div class="name" id="nName">有楽町</div>
+          <div class="read"><span class="kana" id="nKana">ゆうらくちょう</span>
+            <span class="romaji" id="nRom">Yūrakuchō</span></div>
+        </div>
+        <div class="plate"><div class="l" id="plateL">JY</div><div class="n" id="nNo">02</div></div>
+      </div>
+    </div>
+    <div class="here">
+      <div class="cap">ただいまの駅</div>
+      <div class="h-name" id="cName">東京</div>
+      <div class="h-rom" id="cRom">Tokyo · JY01</div>
+      <div class="door">
+        <svg width="42" height="30" viewBox="0 0 42 30" aria-hidden="true">
+          <rect x="1" y="1" width="40" height="28" rx="2" fill="#EDEFEA" stroke="#C3C7BE"/>
+          <rect id="dL" x="3" y="3" width="18" height="24" fill="#fff" stroke="#8A9096"/>
+          <rect id="dR" x="21" y="3" width="18" height="24" fill="#fff" stroke="#8A9096"/>
+        </svg>
+        <div>
+          <div class="d-txt" id="dTxt">ドア閉</div>
+          <div class="d-side" id="dSide"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tf"><div class="tf-cap" id="tfCap">のりかえ</div><div class="tf-list" id="tfList"></div></div>
+
+  <div class="map">
+    <div class="rail" id="rail">
+      <div class="track" id="track"></div>
+      <div class="train" id="train">
+        <svg width="46" height="26" viewBox="0 0 46 26">
+          <path d="M6 3h30c5 0 9 4 9 9v9a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3v-9c0-5 2-9 5-9z" fill="#F2F4F0" stroke="#2B2F35" stroke-width="2"/>
+          <rect id="trainStripe" x="1" y="12" width="44" height="5" fill="#9ACD32"/>
+          <path d="M33 6h5c3 1 5 3 6 6h-11z" fill="#2B2F35" opacity=".85"/>
+          <rect x="7" y="6" width="7" height="5" rx="1" fill="#2B2F35" opacity=".7"/>
+          <rect x="17" y="6" width="7" height="5" rx="1" fill="#2B2F35" opacity=".7"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="audio" id="audioBar">
+    <button id="btnSound">🔊 開聲</button>
+    <div class="st" id="audioSt">撳「開聲」啟動車廂聲同報站。通咗會即刻「叮」一聲。</div>
+  </div>
+
+  <div class="ctl">
+    <button id="btnRun" class="on">▶ 運行中</button>
+    <div class="grp"><span class="lbl">路線</span><select id="selLine"></select></div>
+    <div class="grp"><span class="lbl">方向</span>
+      <div class="seg" id="dirSeg"></div></div>
+    <div class="grp"><span class="lbl">起點</span><select id="selStart"></select></div>
+    <div class="grp"><span class="lbl">行車速度</span>
+      <div class="seg" id="spdSeg">
+        <button data-spd="1" aria-pressed="true">×1</button>
+        <button data-spd="3" aria-pressed="false">×3</button>
+        <button data-spd="8" aria-pressed="false">×8</button>
+      </div></div>
+    <div class="grp"><span class="lbl">報站語速</span>
+      <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.95"></div>
+    <div class="grp"><span class="lbl">車廂聲</span>
+      <input type="range" id="vol" min="0" max="1" step="0.05" value="0.4"></div>
+    <button id="btnVoice" aria-pressed="true">🔊 日＋英</button>
+  </div>
+  <div class="note" id="footnote">
+    <b>開門方向</b>資料源自非官方鐵道部落格整理（内回り 30 站有多個來源互相印證；外回り 僅田端～田町段及澀谷站有確證），車站改建會令方向改變，僅供沉浸感參考，未確認嘅站會如實標示「未確認」而唔會亂估。
+  </div>
+</div>
+
+<script>
+/* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
+   出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
+   田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
+   のみ確証あり。それ以外の外回りは null（未確認・断定しない）。 */
+const C={keihin:'#00B2E5',chuo:'#F15A22',sobu:'#FFD400',tokaido:'#F68B1E',yokosuka:'#0067C0',
+keiyo:'#C9252F',saikyo:'#00AC9A',shonan:'#E21F26',joban:'#00B48D',utsu:'#FF7B25',
+shkT:'#0B318F',shkH:'#29A72B',ginza:'#FF9500',maru:'#F62E36',hibiya:'#B5B5AC',
+tozai:'#009BBF',chiyoda:'#00BB85',yuraku:'#C1A470',hanzo:'#8F76D6',namboku:'#00AC9A',
+fuku:'#9C5E31',asakusa:'#E85298',mita:'#0079C2',shinjukuS:'#6CBB5A',oedo:'#B6007A',
+keikyu:'#D5232D',keisei:'#0067C0',toyoko:'#DA0442',meguroL:'#009CD2',ikegami:'#EE86A2',
+denen:'#20A288',odakyu:'#0071BC',keio:'#DD0077',inokashira:'#1B98D5',seibu:'#1D8DCC',
+tobu:'#007ECD',rinkai:'#0079C2',mono:'#0072BC',yurika:'#0087CB',tx:'#1F286F',
+toneri:'#E95513',arakawa:'#DF0523',yamanote:'#9ACD32',
+musashino:'#C46210',toyokosoku:'#F5A623'};
+const EN={'中央線':'the Chuo Line','京浜東北線':'the Keihin-Tohoku Line','東海道線':'the Tokaido Line',
+'横須賀線':'the Yokosuka Line','京葉線':'the Keiyo Line','東海道新幹線':'the Tokaido Shinkansen',
+'丸ノ内線':'the Marunouchi Line','有楽町線':'the Yurakucho Line','日比谷線':'the Hibiya Line',
+'銀座線':'the Ginza Line','都営浅草線':'the Toei Asakusa Line','ゆりかもめ':'the Yurikamome',
+'東京モノレール':'the Tokyo Monorail','都営大江戸線':'the Toei Oedo Line','都営三田線':'the Toei Mita Line',
+'京急線':'the Keikyu Line','埼京線':'the Saikyo Line','湘南新宿ライン':'the Shonan-Shinjuku Line',
+'りんかい線':'the Rinkai Line','東急池上線':'the Tokyu Ikegami Line','南北線':'the Namboku Line',
+'東急目黒線':'the Tokyu Meguro Line','半蔵門線':'the Hanzomon Line','副都心線':'the Fukutoshin Line',
+'東急東横線':'the Tokyu Toyoko Line','東急田園都市線':'the Tokyu Den-en-toshi Line',
+'京王井の頭線':'the Keio Inokashira Line','千代田線':'the Chiyoda Line','中央・総武線':'the Chuo-Sobu Line',
+'総武線':'the Sobu Line','小田急線':'the Odakyu Line','京王線':'the Keio Line',
+'都営新宿線':'the Toei Shinjuku Line','西武新宿線':'the Seibu Shinjuku Line','東西線':'the Tozai Line',
+'西武池袋線':'the Seibu Ikebukuro Line','東武東上線':'the Tobu Tojo Line','都電荒川線':'the Toden Arakawa Line',
+'日暮里・舎人ライナー':'the Nippori-Toneri Liner','常磐線':'the Joban Line','京成線':'the Keisei Line',
+'宇都宮線・高崎線':'the Utsunomiya and Takasaki Lines','東北新幹線':'the Tohoku Shinkansen',
+'つくばエクスプレス':'the Tsukuba Express','山手線':'the Yamanote Line',
+'東武スカイツリーライン':'the Tobu Skytree Line',
+'武蔵野線':'the Musashino Line','東葉高速線':'the Toyo Rapid Line'};
+const YAMANOTE_STATIONS=[
+['01','東京','とうきょう','Tokyo',[['中央線',C.chuo],['京浜東北線',C.keihin],['東海道線',C.tokaido],['横須賀線',C.yokosuka],['京葉線',C.keiyo],['東海道新幹線',C.shkT],['丸ノ内線',C.maru]],['L','L']],
+['02','有楽町','ゆうらくちょう','Yūrakuchō',[['京浜東北線',C.keihin],['有楽町線',C.yuraku],['日比谷線',C.hibiya]],['L','L']],
+['03','新橋','しんばし','Shimbashi',[['京浜東北線',C.keihin],['東海道線',C.tokaido],['横須賀線',C.yokosuka],['銀座線',C.ginza],['都営浅草線',C.asakusa],['ゆりかもめ',C.yurika]],['L','L']],
+['04','浜松町','はままつちょう','Hamamatsuchō',[['京浜東北線',C.keihin],['東京モノレール',C.mono],['都営浅草線',C.asakusa],['都営大江戸線',C.oedo]],['L','L']],
+['05','田町','たまち','Tamachi',[['京浜東北線',C.keihin],['都営浅草線',C.asakusa],['都営三田線',C.mita]],['L','L']],
+['06','高輪ゲートウェイ','たかなわゲートウェイ','Takanawa Gateway',[['京浜東北線',C.keihin]],['R',null]],
+['07','品川','しながわ','Shinagawa',[['京浜東北線',C.keihin],['東海道線',C.tokaido],['横須賀線',C.yokosuka],['東海道新幹線',C.shkT],['京急線',C.keikyu]],['R',null]],
+['08','大崎','おおさき','Ōsaki',[['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['りんかい線',C.rinkai]],['R',null]],
+['09','五反田','ごたんだ','Gotanda',[['都営浅草線',C.asakusa],['東急池上線',C.ikegami]],['R',null]],
+['10','目黒','めぐろ','Meguro',[['南北線',C.namboku],['都営三田線',C.mita],['東急目黒線',C.meguroL]],['R',null]],
+['11','恵比寿','えびす','Ebisu',[['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['日比谷線',C.hibiya]],['R',null]],
+['12','渋谷','しぶや','Shibuya',[['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['銀座線',C.ginza],['半蔵門線',C.hanzo],['副都心線',C.fuku],['東急東横線',C.toyoko],['東急田園都市線',C.denen],['京王井の頭線',C.inokashira]],['R','R']],
+['13','原宿','はらじゅく','Harajuku',[['千代田線',C.chiyoda],['副都心線',C.fuku]],['R',null]],
+['14','代々木','よよぎ','Yoyogi',[['中央・総武線',C.sobu],['都営大江戸線',C.oedo]],['L',null]],
+['15','新宿','しんじゅく','Shinjuku',[['中央線',C.chuo],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['小田急線',C.odakyu],['京王線',C.keio],['丸ノ内線',C.maru],['都営新宿線',C.shinjukuS],['都営大江戸線',C.oedo]],['L',null]],
+['16','新大久保','しんおおくぼ','Shin-Ōkubo',[],['R',null]],
+['17','高田馬場','たかだのばば','Takadanobaba',[['西武新宿線',C.seibu],['東西線',C.tozai]],['R',null]],
+['18','目白','めじろ','Mejiro',[],['R',null]],
+['19','池袋','いけぶくろ','Ikebukuro',[['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['丸ノ内線',C.maru],['有楽町線',C.yuraku],['副都心線',C.fuku],['西武池袋線',C.seibu],['東武東上線',C.tobu]],['L',null]],
+['20','大塚','おおつか','Ōtsuka',[['都電荒川線',C.arakawa]],['R',null]],
+['21','巣鴨','すがも','Sugamo',[['都営三田線',C.mita]],['R',null]],
+['22','駒込','こまごめ','Komagome',[['南北線',C.namboku]],['R',null]],
+['23','田端','たばた','Tabata',[['京浜東北線',C.keihin]],['L','L']],
+['24','西日暮里','にしにっぽり','Nishi-Nippori',[['京浜東北線',C.keihin],['千代田線',C.chiyoda],['日暮里・舎人ライナー',C.toneri]],['L','L']],
+['25','日暮里','にっぽり','Nippori',[['京浜東北線',C.keihin],['常磐線',C.joban],['京成線',C.keisei],['日暮里・舎人ライナー',C.toneri]],['L','L']],
+['26','鶯谷','うぐいすだに','Uguisudani',[['京浜東北線',C.keihin]],['L','L']],
+['27','上野','うえの','Ueno',[['京浜東北線',C.keihin],['宇都宮線・高崎線',C.utsu],['常磐線',C.joban],['東北新幹線',C.shkH],['銀座線',C.ginza],['日比谷線',C.hibiya],['京成線',C.keisei]],['L','L']],
+['28','御徒町','おかちまち','Okachimachi',[['京浜東北線',C.keihin]],['L','L']],
+['29','秋葉原','あきはばら','Akihabara',[['京浜東北線',C.keihin],['総武線',C.sobu],['日比谷線',C.hibiya],['つくばエクスプレス',C.tx]],['L','L']],
+['30','神田','かんだ','Kanda',[['京浜東北線',C.keihin],['中央線',C.chuo],['銀座線',C.ginza]],['L','L']]
+].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
+
+/* ═══ 銀座線（G01～G19，渋谷⇔浅草，直線來回）═══
+   官方編號其實係由澀谷嗰邊開始數（G01＝渋谷…G19＝浅草），同山手線果種
+   「越行越後」嘅感覺相反，呢個版本已經跟返正確編號方向。
+   開門方向：由用戶提供整理嘅資料，door:[往澀谷方向側,往浅草方向側]。
+   銀座站已經東京メトロ官方確認兩邊都係右側門；赤坂見附因為特殊嘅
+   對向式月台結構，兩個方向都係右側門；浅草站終點會交替使用1／2號
+   月台，開邊道門唔係固定，標做 'R?' 表示「一般右側，但實際睇當日
+   月台」；淺草總站冇「往淺草方向」呢個概念（已經到咗），標 null。
+   轉乘資料按公開嘅車站構造整理，刻意保守，唔夠肯定嘅（例如要出閘
+   轉去另一個站名先算嘅）冇列入去。 */
+const GINZA_STATIONS=[
+['01','渋谷','しぶや','Shibuya',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['半蔵門線',C.hanzo],['副都心線',C.fuku],['東急東横線',C.toyoko],['東急田園都市線',C.denen],['京王井の頭線',C.inokashira]],['L','R']],
+['02','表参道','おもてさんどう','Omotesando',[['千代田線',C.chiyoda],['半蔵門線',C.hanzo]],['L','R']],
+['03','外苑前','がいえんまえ','Gaienmae',[],['R','L']],
+['04','青山一丁目','あおやまいっちょうめ','Aoyama-itchome',[['半蔵門線',C.hanzo],['都営大江戸線',C.oedo]],['R','L']],
+['05','赤坂見附','あかさかみつけ','Akasaka-mitsuke',[['丸ノ内線',C.maru]],['R','R']],
+['06','溜池山王','ためいけさんのう','Tameike-sanno',[['南北線',C.namboku]],['R','L']],
+['07','虎ノ門','とらのもん','Toranomon',[],['R','L']],
+['08','新橋','しんばし','Shimbashi',[['山手線',C.yamanote],['京浜東北線',C.keihin],['東海道線',C.tokaido],['横須賀線',C.yokosuka],['都営浅草線',C.asakusa],['ゆりかもめ',C.yurika]],['R','L']],
+['09','銀座','ぎんざ','Ginza',[['丸ノ内線',C.maru],['日比谷線',C.hibiya]],['R','R']],
+['10','京橋','きょうばし','Kyobashi',[],['R','L']],
+['11','日本橋','にほんばし','Nihombashi',[['東西線',C.tozai],['都営浅草線',C.asakusa]],['R','L']],
+['12','三越前','みつこしまえ','Mitsukoshimae',[['半蔵門線',C.hanzo]],['R','L']],
+['13','神田','かんだ','Kanda',[['山手線',C.yamanote],['京浜東北線',C.keihin],['中央線',C.chuo]],['R','L']],
+['14','末広町','すえひろちょう','Suehirocho',[],['R','L']],
+['15','上野広小路','うえのひろこうじ','Ueno-hirokoji',[['都営大江戸線',C.oedo]],['R','L']],
+['16','上野','うえの','Ueno',[['山手線',C.yamanote],['京浜東北線',C.keihin],['宇都宮線・高崎線',C.utsu],['常磐線',C.joban],['東北新幹線',C.shkH],['日比谷線',C.hibiya],['京成線',C.keisei]],['R','L']],
+['17','稲荷町','いなりちょう','Inaricho',[],['R','L']],
+['18','田原町','たわらまち','Tawaramachi',[],['R','L']],
+['19','浅草','あさくさ','Asakusa',[['都営浅草線',C.asakusa],['東武スカイツリーライン',C.tobu]],['R?',null]]
+].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
+
+/* ═══ 日比谷線（H01～H22，中目黒⇔北千住，直線來回）═══
+   官方編號同排序已經對住 tokyometro.jp 官網個別站頁面URL核實過
+   （例如中目黒站個URL係 /station/naka-meguro/…／H01，北千住方向遞增）。
+   開門方向：用戶提供整理，door:[往中目黒方向側,往北千住方向側]。
+   北千住係終點兼折返站，往中目黒方向會因應當日用開邊個月台而左右都
+   有可能，用特殊值 'LR' 表示，doorSideText() 已經加咗呢個case。
+   轉乘資料保守處理：虎ノ門ヒルズ↔虎ノ門(銀座線)、仲御徒町↔上野御徒町
+   (銀座線／大江戸線)、人形町↔水天宮前、築地↔新富町(有楽町線) 呢類
+   「唔同站名但東京メトロ官方當做同一組轉乘」嘅鄰接站，跟返官方頁面
+   都有列，所以有列入去；純粹地理相近但官方冇當轉乘嘅冇亂加。 */
+const HIBIYA_STATIONS=[
+['01','中目黒','なかめぐろ','Naka-meguro',[['東急東横線',C.toyoko]],['L','L']],
+['02','恵比寿','えびす','Ebisu',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan]],['L','L']],
+['03','広尾','ひろお','Hiroo',[],['L','L']],
+['04','六本木','ろっぽんぎ','Roppongi',[['都営大江戸線',C.oedo]],['L','L']],
+['05','神谷町','かみやちょう','Kamiyacho',[],['L','L']],
+['06','虎ノ門ヒルズ','とらのもんヒルズ','Toranomon Hills',[['銀座線',C.ginza]],['L','L']],
+['07','霞ケ関','かすみがせき','Kasumigaseki',[['丸ノ内線',C.maru],['千代田線',C.chiyoda]],['R','R']],
+['08','日比谷','ひびや','Hibiya',[['千代田線',C.chiyoda],['有楽町線',C.yuraku],['都営三田線',C.mita]],['L','L']],
+['09','銀座','ぎんざ','Ginza',[['銀座線',C.ginza],['丸ノ内線',C.maru]],['R','R']],
+['10','東銀座','ひがしぎんざ','Higashi-ginza',[['都営浅草線',C.asakusa]],['R','R']],
+['11','築地','つきじ','Tsukiji',[['有楽町線',C.yuraku]],['L','L']],
+['12','八丁堀','はっちょうぼり','Hatchobori',[['京葉線',C.keiyo]],['R','R']],
+['13','茅場町','かやばちょう','Kayabacho',[['東西線',C.tozai]],['L','L']],
+['14','人形町','にんぎょうちょう','Ningyocho',[['都営浅草線',C.asakusa]],['L','L']],
+['15','小伝馬町','こでんまちょう','Kodemmacho',[],['L','L']],
+['16','秋葉原','あきはばら','Akihabara',[['山手線',C.yamanote],['京浜東北線',C.keihin],['総武線',C.sobu],['つくばエクスプレス',C.tx]],['L','L']],
+['17','仲御徒町','なかおかちまち','Naka-okachimachi',[['銀座線',C.ginza],['都営大江戸線',C.oedo]],['R','R']],
+['18','上野','うえの','Ueno',[['山手線',C.yamanote],['京浜東北線',C.keihin],['宇都宮線・高崎線',C.utsu],['常磐線',C.joban],['東北新幹線',C.shkH],['銀座線',C.ginza],['京成線',C.keisei]],['L','L']],
+['19','入谷','いりや','Iriya',[],['L','L']],
+['20','三ノ輪','みのわ','Minowa',[['都電荒川線',C.arakawa]],['L','L']],
+['21','南千住','みなみせんじゅ','Minami-senju',[['常磐線',C.joban],['つくばエクスプレス',C.tx]],['L','L']],
+['22','北千住','きたせんじゅ','Kita-senju',[['常磐線',C.joban],['千代田線',C.chiyoda],['東武スカイツリーライン',C.tobu],['つくばエクスプレス',C.tx]],['LR','R']]
+].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
+
+/* ═══ 東西線（T01～T23，中野⇔西船橋，直線來回）═══
+   官方編號同排序已經對住 tokyometro.jp 官網個路線總覽頁核實過
+   （T01中野…T23西船橋，一共23個站，中野以西直通JR中央線去三鷹、
+   西船橋以東直通東葉高速線嗰啲唔算入官方東京メトロ嘅站，冇計）。
+   轉乘資料：得返官方頁面有列嘅先算，跟返銀座線／日比谷線嗰個保守
+   原則。開門方向：door:[往中野方向側,往西船橋方向側]，由用戶提供
+   整理。中野、妙典、西船橋呢三個站用戶特別標記兩個方向都係「左／
+   右皆有可能」（多股道／終點交替月台等原因），用特殊值 'LR' 表示。 */
+const TOZAI_STATIONS=[
+['01','中野','なかの','Nakano',[['中央線',C.chuo],['中央・総武線',C.sobu]],['LR','LR']],
+['02','落合','おちあい','Ochiai',[],['R','R']],
+['03','高田馬場','たかだのばば','Takadanobaba',[['山手線',C.yamanote],['西武新宿線',C.seibu]],['L','L']],
+['04','早稲田','わせだ','Waseda',[],['L','L']],
+['05','神楽坂','かぐらざか','Kagurazaka',[],['R','L']],
+['06','飯田橋','いいだばし','Iidabashi',[['有楽町線',C.yuraku],['南北線',C.namboku],['都営大江戸線',C.oedo],['中央・総武線',C.sobu]],['L','L']],
+['07','九段下','くだんした','Kudanshita',[['半蔵門線',C.hanzo],['都営新宿線',C.shinjukuS]],['L','L']],
+['08','竹橋','たけばし','Takebashi',[],['L','L']],
+['09','大手町','おおてまち','Otemachi',[['丸ノ内線',C.maru],['千代田線',C.chiyoda],['半蔵門線',C.hanzo],['都営三田線',C.mita]],['R','R']],
+['10','日本橋','にほんばし','Nihombashi',[['銀座線',C.ginza],['都営浅草線',C.asakusa]],['R','R']],
+['11','茅場町','かやばちょう','Kayabacho',[['日比谷線',C.hibiya]],['R','R']],
+['12','門前仲町','もんぜんなかちょう','Monzen-nakacho',[['都営大江戸線',C.oedo]],['L','L']],
+['13','木場','きば','Kiba',[],['R','R']],
+['14','東陽町','とうようちょう','Toyocho',[],['L','L']],
+['15','南砂町','みなみすなまち','Minami-sunamachi',[],['R','R']],
+['16','西葛西','にしかさい','Nishi-kasai',[],['L','L']],
+['17','葛西','かさい','Kasai',[],['L','L']],
+['18','浦安','うらやす','Urayasu',[],['L','L']],
+['19','南行徳','みなみぎょうとく','Minami-gyotoku',[],['L','L']],
+['20','行徳','ぎょうとく','Gyotoku',[],['L','L']],
+['21','妙典','みょうでん','Myoden',[],['LR','LR']],
+['22','原木中山','ばらきなかやま','Baraki-nakayama',[],['L','L']],
+['23','西船橋','にしふなばし','Nishi-funabashi',[['中央・総武線',C.sobu],['武蔵野線',C.musashino],['東葉高速線',C.toyokosoku]],['LR','LR']]
+].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
+
+/* ═══ 路線總表：每條線嘅色系／徽章／拓撲／方向標籤／footnote ═══ */
+const LINES={
+  yamanote:{
+    id:'yamanote', name:'山手線', badge:'JY', topology:'loop',
+    color:'#9ACD32', colorDeep:'#5E8A0E',
+    dirLabels:['外回り','内回り'],
+    stations:YAMANOTE_STATIONS,
+    footnote:'<b>開門方向</b>資料源自非官方鐵道部落格整理（内回り 30 站有多個來源互相印證；外回り 僅田端～田町段及澀谷站有確證），車站改建會令方向改變，僅供沉浸感參考，未確認嘅站會如實標示「未確認」而唔會亂估。'
+  },
+  ginza:{
+    id:'ginza', name:'銀座線', badge:'G', topology:'linear',
+    color:'#FF9500', colorDeep:'#B35900',
+    dirLabels:['浅草方面','渋谷方面'],
+    stations:GINZA_STATIONS,
+    footnote:'<b>開門方向</b>資料由用戶提供整理，銀座站兩個方向已經東京メトロ官方確認都係右側門；赤坂見附因為特殊嘅對向式月台結構，兩個方向都係右側門；淺草總站到站會交替用1／2號月台，開門側唔係固定，標「一般右側」僅供參考；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
+  },
+  hibiya:{
+    id:'hibiya', name:'日比谷線', badge:'H', topology:'linear',
+    color:'#B5B5AC', colorDeep:'#6E7175',
+    dirLabels:['北千住方面','中目黒方面'],
+    stations:HIBIYA_STATIONS,
+    footnote:'<b>開門方向</b>資料由用戶提供整理；北千住係終點兼折返站，往中目黒方向會因應當日用開邊個月台而左右都有可能，冇固定答案；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅鄰接站轉乘（例如虎ノ門ヒルズ↔虎ノ門、仲御徒町↔上野御徒町）先會列入去；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
+  },
+  tozai:{
+    id:'tozai', name:'東西線', badge:'T', topology:'linear',
+    color:'#009BBF', colorDeep:'#00647A',
+    dirLabels:['西船橋方面','中野方面'],
+    stations:TOZAI_STATIONS,
+    footnote:'<b>開門方向</b>資料由用戶提供整理；中野、妙典、西船橋因為多股道／終點交替月台等原因，兩個方向都標「左／右皆有可能」；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅先會列入去；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
+  }
+};
+let CUR=LINES.yamanote;
+let S=CUR.stations;
+
+/* ═══ 設定 ═══ */
+const T={run:18,soon:8,open:3,dwell:12,close:4};
+const B={run:T.run,soon:T.run+T.soon,open:T.run+T.soon+T.open,
+         dwell:T.run+T.soon+T.open+T.dwell};
+const CYCLE=B.dwell+T.close, GAP=120;
+
+let idx=0,t=0,outer=true,dirMode='out',running=true;
+let speed=1,rate=.95,vol=.4,voiceOn=true,phase='',lapMark=0,genId=0;
+let v=0,vPrev=0,accel=0,tabHidden=false;
+const $=id=>document.getElementById(id);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* 環狀路線（山手線）：一圈行晒 N 個站，wrap 返轉頭。
+   直線來回路線（銀座線）：模擬一條「去到總站自動调头」嘅虛擬長條，
+   長度係 2×(N-1)，行到尾自動掉返轉頭，唔使額外狀態機。 */
+function order(){
+  const N=S.length;
+  if(CUR.topology==='loop') return outer?S:[S[0],...S.slice(1).reverse()];
+  const per=Math.max(2*(N-1),1);
+  const seq=[];
+  for(let m=0;m<per;m++){ const real=m<=N-1?m:per-m; seq.push(outer?S[real]:S[N-1-real]); }
+  return seq;
+}
+const at=i=>{ const o=order(); return o[((i%o.length)+o.length)%o.length]; };
+
+/* ═══════════ 音響 ═══════════ */
+let ac=null,sfx=null,nBuf=null,built=false,greeted=false;
+let rollSrc,rollFilt,rollGain,vvA,vvB,vvFilt,vvGain,rumbleGain,clackNext=0;
+
+function buildGraph(){
+  if(built) return; built=true;
+  sfx=ac.createGain(); sfx.gain.value=vol; sfx.connect(ac.destination);
+  const len=Math.floor(ac.sampleRate*2);
+  nBuf=ac.createBuffer(1,len,ac.sampleRate);
+  const d=nBuf.getChannelData(0); let lp=0;
+  for(let i=0;i<len;i++){const w=Math.random()*2-1; lp=lp*.94+w*.06; d[i]=lp*5;}
+
+  rollSrc=ac.createBufferSource(); rollSrc.buffer=nBuf; rollSrc.loop=true;
+  rollFilt=ac.createBiquadFilter(); rollFilt.type='lowpass'; rollFilt.frequency.value=300;
+  const hp=ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=48;
+  rollGain=ac.createGain(); rollGain.gain.value=0;
+  rollSrc.connect(rollFilt).connect(hp).connect(rollGain).connect(sfx); rollSrc.start();
+
+  const rSrc=ac.createBufferSource(); rSrc.buffer=nBuf; rSrc.loop=true;
+  const rF=ac.createBiquadFilter(); rF.type='lowpass'; rF.frequency.value=95;
+  rumbleGain=ac.createGain(); rumbleGain.gain.value=.04;
+  rSrc.connect(rF).connect(rumbleGain).connect(sfx); rSrc.start();
+
+  vvA=ac.createOscillator(); vvA.type='sawtooth';
+  vvB=ac.createOscillator(); vvB.type='square';
+  vvFilt=ac.createBiquadFilter(); vvFilt.type='bandpass'; vvFilt.Q.value=5;
+  vvGain=ac.createGain(); vvGain.gain.value=0;
+  vvA.connect(vvFilt); vvB.connect(vvFilt); vvFilt.connect(vvGain).connect(sfx);
+  vvA.frequency.value=60; vvB.frequency.value=90; vvA.start(); vvB.start();
+  clackNext=ac.currentTime+.4;
+}
+
+let speechPrimed=false;
+function primeSpeech(){
+  /* iOS Safari 淨係俾「用戶手指嗰下撳落」呢個瞬間直接call speak()先真係會出聲，
+     之後嗰啲靠setTimeout延遲先call嘅speak()（例如報站，delay 700~1100ms）
+     喺iOS會靜靜哋失敗，冇錯誤、都冇聲。所以要喺呢個撳掣嘅同一個瞬間，
+     搶閘講一句冇聲量嘅嘢，「解鎖」咗之後成個phase啲報站先會出到聲。 */
+  if(speechPrimed||!window.speechSynthesis) return;
+  speechPrimed=true;
+  try{
+    const u=new SpeechSynthesisUtterance(' ');
+    u.volume=0; u.rate=10;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function initAudio(){
+  try{
+    if(!ac){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC){ audioStatus('no-api'); return; }
+      ac=new AC(); buildGraph();
+    }
+    if(ac.state!=='running'){
+      ac.resume().then(()=>{ audioStatus(); ding(); }).catch(()=>audioStatus('blocked'));
+    }else{ audioStatus(); ding(); }
+    if(window.speechSynthesis){ speechSynthesis.resume(); primeSpeech(); }
+  }catch(e){ audioStatus('blocked'); }
+}
+function ding(){ if(!greeted&&ac&&ac.state==='running'){ greeted=true; tone(880,0,.4,.18); tone(1175,.16,.5,.14); } }
+function audioStatus(err){
+  const bar=$('audioBar'), st=$('audioSt'), btn=$('btnSound');
+  if(err==='no-api'){ st.className='st bad';
+    st.innerHTML='<b>呢個瀏覽器唔支援 Web Audio</b>，試下用 Chrome、Edge 或者 Safari。'; return; }
+  if(ac&&ac.state==='running'){
+    bar.classList.add('live'); btn.textContent='🔈 音響已開';
+    st.className='st';
+    st.innerHTML='<b>音響運作中</b>　VVVF、路軌接口聲、ピンポーン、日英報站全部啟動咗。';
+  }else{
+    st.className='st bad';
+    st.innerHTML='<b>瀏覽器封鎖緊聲音。</b>如果你係喺預覽視窗（iframe）入面睇，請下載個 HTML 檔再 double-click 用瀏覽器直接開。';
+  }
+}
+addEventListener('pointerdown',initAudio);
+addEventListener('keydown',initAudio);
+
+/* Page Visibility：背景分頁自動 suspend，返嚟先 resume＋重新對時基準 */
+document.addEventListener('visibilitychange',()=>{
+  tabHidden=document.hidden;
+  if(tabHidden){
+    if(ac&&ac.state==='running') ac.suspend();
+    stopSpeech();
+  }else{
+    if(ac&&ac.state!=='running'&&built) ac.resume();
+    last=performance.now();          // 避免返嚟嗰下 dt 爆錶
+    if(ac) clackNext=ac.currentTime+.4;   // 重新對路軌聲嘅排程時基
+  }
+});
+
+function tone(f,dly,dur,g0,type){
+  if(!ac||!sfx) return;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type=type||'sine'; o.frequency.value=f;
+  const s=ac.currentTime+dly;
+  g.gain.setValueAtTime(0,s); g.gain.linearRampToValueAtTime(g0,s+.015);
+  g.gain.exponentialRampToValueAtTime(.0004,s+dur);
+  o.connect(g).connect(sfx); o.start(s); o.stop(s+dur+.05);
+}
+function noiseBurst(dly,dur,g0,freq,Q,type){
+  if(!ac||!nBuf||!sfx) return;
+  const s=ac.createBufferSource(); s.buffer=nBuf;
+  s.playbackRate.value=1+Math.random()*.4;
+  const f=ac.createBiquadFilter(); f.type=type||'bandpass'; f.frequency.value=freq; f.Q.value=Q||1;
+  const g=ac.createGain(); const st=ac.currentTime+dly;
+  g.gain.setValueAtTime(0,st); g.gain.linearRampToValueAtTime(g0,st+.006);
+  g.gain.exponentialRampToValueAtTime(.0004,st+dur);
+  s.connect(f).connect(g).connect(sfx); s.start(st); s.stop(st+dur+.05);
+}
+function clackPair(a0,amp,rf){
+  noiseBurst(a0,.09,amp,780,1.4); noiseBurst(a0+.055,.11,amp*.8,430,1.2);
+  noiseBurst(a0+.16*rf,.09,amp*.72,700,1.4); noiseBurst(a0+.215*rf,.11,amp*.58,400,1.2);
+}
+function scheduleClacks(){
+  if(!ac||ac.state!=='running'||v<.06||!running||tabHidden) return;
+  const now=ac.currentTime;
+  if(clackNext<now) clackNext=now+.03;
+  const interval=(1.35/(0.18+v*1.5))/Math.max(speed,1);
+  while(clackNext<now+.35){ clackPair(clackNext-now,.075*Math.pow(v,.8),1/(0.25+v)); clackNext+=interval; }
+}
+const chimePing=()=>{ tone(1050,0,.75,.20); tone(788,.30,.95,.18); };
+const chimeDoor=()=>{ for(let i=0;i<4;i++) tone(1180,i*.34,.17,.15); };
+const airRelease=g=>noiseBurst(0,.85,g||.11,2600,.7,'highpass');
+const doorAir=()=>noiseBurst(0,.45,.07,3400,.7,'highpass');
+
+/* ═══ 語音：保留 utterance 全域引用，防止播放中途被 GC 回收 ═══
+   speak()嘅排隊策略：正常速度（×1）嗰陣，新嘅announce唔會打斷緊
+   出緊聲嗰句（例如轉乘站多嘅站，まもなく個轉乘名單未讀完），會排
+   隊等講完先接住講下一句，等長轉乘名單有機會講完全句，唔會俾下一
+   個phase嘅報站打斷咗中途。快進（×3／×8）嗰陣就保留返舊有做法：
+   即刻cancel舊嘅、開始新嘅，唔係就會越積越多、聲畫嚴重甩節。
+   真正需要「即刻收晒聲、唔留低隊」嘅場合（切線／跳站／停低/靜音/
+   分頁隱藏）一律用 stopSpeech()，唔經呢個排隊邏輯。 */
+let queue=[], liveUtterances=[], speaking=false;
+function stopSpeech(){
+  queue=[]; speaking=false;
+  if(window.speechSynthesis) speechSynthesis.cancel();
+}
+function speak(list){
+  if(!voiceOn||!window.speechSynthesis) return;
+  if(speed>1){ speechSynthesis.cancel(); liveUtterances=[]; queue=list.slice(); speaking=false; nextUtt(); return; }
+  queue=queue.concat(list);
+  if(!speaking) nextUtt();
+}
+function nextUtt(){
+  if(!queue.length){ speaking=false; return; }
+  speaking=true;
+  const [lang,text]=queue.shift();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=lang; u.rate=rate; u.pitch=lang==='ja-JP'?1.05:1;
+  const vo=speechSynthesis.getVoices().find(x=>x.lang.startsWith(lang.slice(0,2)));
+  if(vo) u.voice=vo;
+  liveUtterances.push(u);                 // 強引用，播完先放走
+  const done=()=>{ liveUtterances=liveUtterances.filter(x=>x!==u); nextUtt(); };
+  u.onend=done; u.onerror=done;
+  speechSynthesis.speak(u);
+}
+if(window.speechSynthesis){
+  speechSynthesis.onvoiceschanged=()=>{
+    if(!speechSynthesis.getVoices().some(x=>x.lang.startsWith('ja'))&&ac&&ac.state==='running')
+      $('audioSt').innerHTML='音響運作中，但你部機<b>未裝日文語音</b>，日文嗰段唔會出聲（英文照講）。裝咗系統語音包再 refresh 就得。';
+  };
+}
+function announce(jp,en,delay){
+  chimePing();
+  const g=genId; // 記低嗰刻嘅「代數」，切線／跳站之後呢個舊報站就唔會再開聲
+  setTimeout(()=>{ if(g===genId) speak([['ja-JP',jp],['en-US',en]]); },delay||1100);
+}
+
+/* ═══ 路線図 ═══ */
+const rail=$('rail');
+function strip(){
+  [...rail.querySelectorAll('.stop')].forEach(e=>e.remove());
+  for(let k=idx-4;k<=idx+9;k++){
+    const st=at(k),d=document.createElement('div');
+    d.className='stop'; d.dataset.k=k; d.style.left=(k*GAP)+'px';
+    d.innerHTML=`<div class="dot"></div><div class="s-name">${st.kanji}</div><div class="s-no">${CUR.badge}${st.no}</div>`;
+    rail.appendChild(d);
+  }
+  $('track').style.left=((idx-5)*GAP)+'px'; $('track').style.width=(15*GAP)+'px';
+}
+
+/* ═══ 表示 ═══ */
+function doorSideText(st){
+  const side = outer ? st.door[1] : st.door[0];
+  if(side==='L') return {cls:'', html:'<b>◀ 左側</b>ドアが開きます', side};
+  if(side==='R') return {cls:'', html:'<b>右側 ▶</b>ドアが開きます', side};
+  if(side==='R?') return {cls:'unknown', html:'<b>右側 ▶</b>（一般，實際睇當日月台）', side};
+  if(side==='LR') return {cls:'unknown', html:'<b>◀ 左 ／ 右 ▶</b>兩邊都有可能，睇當日月台', side};
+  return {cls:'unknown', html:'開く側は未確認', side:null};
+}
+function paintDoorHighlight(side){
+  /* 開門方向色彩區分：即將開嗰道用線色高亮，另一道保持中性灰白；
+     完全確定嘅先至加閃動（'soon'/'open' 階段），唔夠肯定嘅（R?／LR）
+     淨係靜態高亮，唔閃，等用戶睇得出呢個係「有把握」定「僅供參考」。 */
+  const dL=$('dL'), dR=$('dR');
+  const hiL = side==='L'||side==='LR';
+  const hiR = side==='R'||side==='R?'||side==='LR';
+  const confident = side==='L'||side==='R';
+  const flashing = confident && (phase==='soon'||phase==='open');
+  dL.classList.toggle('hi',hiL); dR.classList.toggle('hi',hiR);
+  dL.classList.toggle('flash', flashing && hiL);
+  dR.classList.toggle('flash', flashing && hiR);
+}
+function paint(){
+  const stopped=phase==='open'||phase==='dwell'||phase==='close';
+  const cur=stopped?at(idx+1):at(idx), nx=stopped?at(idx+2):at(idx+1);
+  const focus=stopped?cur:nx;
+  $('nName').textContent=nx.kanji; $('nName').title=nx.kanji;
+  $('nKana').textContent=nx.kana;
+  $('nRom').textContent=nx.rom; $('nRom').title=nx.rom;
+  $('nNo').textContent=nx.no;
+  $('cName').textContent=cur.kanji; $('cName').title=cur.kanji;
+  $('cRom').textContent=`${cur.rom} · ${CUR.badge}${cur.no}`;
+  const eb=$('eyebrow');
+  eb.classList.toggle('hot',phase==='soon'||phase==='close');
+  eb.textContent=phase==='run'?'つぎは':phase==='soon'?'まもなく':phase==='close'?'まもなく発車':'つぎは';
+  $('tfCap').textContent=`${focus.kanji}駅 のりかえ`;
+  const L=$('tfList'); L.innerHTML='';
+  if(!focus.tf.length) L.innerHTML='<span class="tf-none">のりかえはありません</span>';
+  else focus.tf.forEach(([n,c])=>{const s=document.createElement('span');
+    s.className='chip'; s.style.setProperty('--c',c); s.textContent=n; L.appendChild(s);});
+  const ds=doorSideText(focus), dEl=$('dSide');
+  dEl.className='d-side '+ds.cls; dEl.innerHTML=ds.html;
+  paintDoorHighlight(ds.side);
+}
+function doors(a){
+  const w=Math.max(18*(1-a),0);
+  $('dL').setAttribute('width',w);
+  $('dR').setAttribute('width',w); $('dR').setAttribute('x',39-w);
+  const txt=$('dTxt'); txt.classList.toggle('open',a>.05);
+  txt.textContent=a>.95?'ドア開':a>.05?(phase==='close'?'ドア閉まります':'ドア動作中'):'ドア閉';
+}
+
+/* ═══ 進行 ═══ */
+function enter(p){
+  if(p===phase) return;
+  const prev=phase; phase=p;
+  /* 注意：idx嘅推進要喺呢度、計算n之前就做好，唔可以放去落面先做——
+     以前個bug就係calc咗n＝at(idx+1)先至先至idx++，搞到啱啱departure
+     嗰下嘅『run』報站用咗舊嗰個idx，講咗返轉頭嗰個站（啱啱走咗嗰個），
+     而唔係真正下一個站，畫面就啱（因為paint()喺idx++之後先call），
+     單係把口講錯。而家先idx++／處理埋dirMode『alt』調頭，先計n，
+     咁報站同畫面先會用返同一個、啱嘅idx。 */
+  if(prev==='close'&&p==='run'){
+    idx++;
+    if(dirMode==='alt'&&++lapMark>=S.length){lapMark=0;outer=!outer;idx=-idx-1;setDirLabel();}
+    strip();
+  }
+  const n=at(idx+1);
+  const enTf=n.tf.map(x=>EN[x[0]]).filter(Boolean).slice(0,3);
+  const side = outer ? n.door[1] : n.door[0];
+  const sideJp = side==='L' ? '左側の' : side==='R' ? '右側の' : '';
+  const sideEn = side==='L' ? ' on the left side' : side==='R' ? ' on the right side' : '';
+  if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
+  if(p==='soon') announce(
+    `まもなく、${n.kanji}、${n.kanji}です。`+(n.tf.length?`${n.tf.map(x=>x[0]).join('、')}は、お乗り換えです。`:''),
+    `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}.`:''));
+  if(p==='open'){ airRelease(.13); doorAir();
+    announce(`${n.kanji}、${n.kanji}です。${sideJp}ドアが開きます。ご注意ください。`,
+              `This is ${n.rom}. The doors${sideEn} will open.`,700); }
+  if(p==='close'){ chimeDoor();
+    const g=genId;
+    setTimeout(()=>{ if(g===genId) speak([['ja-JP','ドアが閉まります。ご注意ください。'],
+                          ['en-US','The doors are closing. Please watch your step.']]); },400);
+    setTimeout(doorAir,1500); }
+  paint();
+}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,.25)*speed; last=now;
+  if(running&&!tabHidden){ t+=dt; if(t>=CYCLE) t-=CYCLE; }
+  const p=t<B.run?'run':t<B.soon?'soon':t<B.open?'open':t<B.dwell?'dwell':'close';
+  enter(p);
+
+  vPrev=v;
+  if(p==='run'){ const e=t/T.run; v=e<.34?Math.pow(e/.34,.7):1-(e-.34)*.12; }
+  else if(p==='soon'){ const e=(t-B.run)/T.soon; v=Math.max(0,Math.pow(1-e,1.6)*.88); }
+  else v=0;
+  accel=(v-vPrev)/Math.max(dt,1e-4);
+
+  let prog;
+  if(p==='run'||p==='soon'){ const e=t/B.soon; prog=reduce?e:e*e*(3-2*e); } else prog=1;
+  const pos=(idx+prog)*GAP;
+  rail.style.transform=`translateX(${rail.parentElement.clientWidth/2-pos}px)`;
+  $('train').style.left=pos+'px';
+  rail.querySelectorAll('.stop').forEach(e=>
+    e.classList.toggle('on',Number(e.dataset.k)===(prog===1?idx+1:idx)));
+
+  let a=0;
+  if(p==='open') a=(t-B.soon)/T.open;
+  else if(p==='dwell') a=1;
+  else if(p==='close') a=1-(t-B.dwell)/T.close;
+  doors(Math.max(0,Math.min(1,a)));
+
+  if(ac&&sfx&&ac.state==='running'&&!tabHidden){
+    sfx.gain.value+=(vol-sfx.gain.value)*.1;
+    const on=running?1:0;
+    rollGain.gain.value+=((Math.pow(v,1.4)*.5*on)-rollGain.gain.value)*.08;
+    rollFilt.frequency.value=220+v*900;
+    const sing=Math.min(1,Math.abs(accel)*7), f=58+v*330;
+    vvA.frequency.value=f; vvB.frequency.value=f*1.49; vvFilt.frequency.value=f*2.4+300;
+    vvGain.gain.value+=((sing*.055*on)-vvGain.gain.value)*.09;
+    rumbleGain.gain.value=.03+v*.02;
+    scheduleClacks();
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ═══ 操作 ═══ */
+function setDirLabel(){ $('dirLabel').textContent=CUR.dirLabels[outer?0:1]; }
+function buildDirSeg(){
+  let html=`<button data-dir="out" aria-pressed="true">${CUR.dirLabels[0]}</button>`+
+           `<button data-dir="in" aria-pressed="false">${CUR.dirLabels[1]}</button>`;
+  if(CUR.topology==='loop') html+='<button data-dir="alt" aria-pressed="false">每圈調頭</button>';
+  $('dirSeg').innerHTML=html;
+}
+function buildSelStart(){
+  const sel=$('selStart'); sel.innerHTML='';
+  S.forEach(s=>{const o=document.createElement('option');
+    o.value=s.no; o.textContent=`${CUR.badge}${s.no}　${s.kanji}`; sel.appendChild(o);});
+}
+function switchLine(id){
+  const L=LINES[id]; if(!L||L===CUR){ if(L) CUR=L; return; }
+  CUR=L; S=L.stations;
+  document.documentElement.style.setProperty('--uguisu',L.color);
+  document.documentElement.style.setProperty('--uguisu-deep',L.colorDeep);
+  $('jyBadge').textContent=L.badge; $('lineName').textContent=L.name;
+  $('plateL').textContent=L.badge; $('trainStripe').setAttribute('fill',L.color);
+  $('footnote').innerHTML=L.footnote;
+  outer=true; dirMode='out'; lapMark=0; idx=0; t=0; phase=''; genId++;
+  stopSpeech();
+  buildDirSeg(); buildSelStart(); setDirLabel(); strip(); paint();
+}
+$('btnSound').onclick=initAudio;
+$('btnRun').onclick=e=>{
+  initAudio(); running=!running;
+  e.target.textContent=running?'▶ 運行中':'⏸ 停低咗';
+  e.target.classList.toggle('on',running);
+  if(!running) stopSpeech();
+};
+$('dirSeg').onclick=e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  dirMode=b.dataset.dir; lapMark=0;
+  [...e.currentTarget.children].forEach(x=>x.setAttribute('aria-pressed',x===b));
+  if(dirMode!=='alt'){ const want=dirMode==='out';
+    if(want!==outer){ const cur=at(idx+1); outer=want; jumpTo(cur.no); } }
+  setDirLabel(); paint();
+};
+$('spdSeg').onclick=e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  speed=Number(b.dataset.spd);
+  [...e.currentTarget.children].forEach(x=>x.setAttribute('aria-pressed',x===b));
+};
+$('btnVoice').onclick=e=>{
+  voiceOn=!voiceOn; e.target.setAttribute('aria-pressed',voiceOn);
+  e.target.textContent=voiceOn?'🔊 日＋英':'🔇 靜音';
+  if(!voiceOn) stopSpeech();
+};
+$('rate').oninput=e=>rate=Number(e.target.value);
+$('vol').oninput=e=>vol=Number(e.target.value);
+
+function jumpTo(no){
+  const list=order(),k=list.findIndex(s=>s.no===no);
+  idx=k-1; t=B.soon+.01; phase=''; lapMark=0; genId++;
+  stopSpeech();
+  strip(); paint();
+}
+$('selStart').onchange=e=>{ initAudio(); jumpTo(e.target.value); };
+
+/* ═══ 乘客／全螢幕模式：隱藏開發者控制列，淨係留返個顯示屏本身 ═══ */
+let passengerMode=false;
+function setPassengerMode(on){
+  passengerMode=on;
+  document.querySelector('.unit').classList.toggle('passenger',on);
+  const b=$('btnPassenger');
+  b.textContent=on?'⤢':'⛶';
+  b.title=on?'退出乘客模式':'乘客模式（隱藏控制項，全螢幕顯示）';
+}
+$('btnPassenger').onclick=e=>{
+  e.stopPropagation();
+  setPassengerMode(!passengerMode);
+  if(passengerMode){
+    if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
+  }else if(document.fullscreenElement&&document.exitFullscreen){
+    document.exitFullscreen().catch(()=>{});
+  }
+};
+document.addEventListener('fullscreenchange',()=>{
+  if(!document.fullscreenElement&&passengerMode) setPassengerMode(false);
+});
+
+const selLine=$('selLine');
+Object.values(LINES).forEach(L=>{const o=document.createElement('option');
+  o.value=L.id; o.textContent=`${L.badge} ${L.name}`; selLine.appendChild(o);});
+selLine.value=CUR.id;
+selLine.onchange=e=>{ initAudio(); switchLine(e.target.value); };
+
+buildDirSeg(); buildSelStart(); setDirLabel(); strip(); paint(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
