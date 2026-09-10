@@ -1,56 +1,141 @@
-東京地下鐵車內顯示屏 · 交接文件（2026-09-10，v1.1）
+東京地下鐵車內顯示屏 · 交接文件（2026-09-10，v1.2.1）
 
 呢個係 Loegunn 嘅興趣project：單一 HTML 檔案嘅車廂資訊顯示屏模擬器（次頁「つぎは」LCD風格＋語音報站＋橫向路線strip），原本淨係山手線，而家改成可以喺同一個網頁切換多條線。長遠目標係整成一個app俾「鐵膠」（鐵道迷）玩，仲未有明確時間表，用戶自評依家「10分滿分得6分，好多細節未執」。
 
-版本號規則（2026-09-10新增嘅固定要求，之後每次都要跟）：
+版本號規則（2026-09-10新增嘅固定要求，之後每次都要跟）
 - 格式：v1.0、v1.0.1、v1.1、v2.0，v後面唔加點。修bug/文字/小幅調整＝patch；加新功能/明顯體驗改善＝minor；大幅改版/主要架構更新＝major。
 - 同一次工作嘅中間存檔唔使跟住升版，以「正式交付」做單位。
 - 之前歷次交付冇正式版本號紀錄，2026-09-10追溯訂做v1.0基準。
-- 程式入面const APP_VERSION='v1.1';（喺script最頂）係單一資料來源。每次正式交付都要記得同步升呢個常數。
+- 程式入面const APP_VERSION='v1.2.1';（喺script最頂、注釋之後）係單一資料來源，$('appVer').textContent=APP_VERSION;喺init嗰段set；HTML入面對應嘅element係<div class="ver" id="appVer">。每次正式交付都要記得同步升呢個常數，唔好淨係改功能唔改版本號。
+- 每次交付：開發日誌新記錄要包含版本、日期、新增功能、修正問題、測試結果、已知問題及未驗證項目；交付訊息要寫明「由邊個版本更新至邊個版本」；index.html呢個檔名要keep住（唔好改名），方便GitHub Pages流程；舊更新紀錄唔好覆蓋，新記錄加喺頂；追溯唔到確實版本嘅歷史紀錄唔好杜撰版本號，寫「版本號未記錄」。
 
-版本歷程：
+版本歷程
 1. 無bgm嘅yamanotev5.html（用戶原本上載）— 純山手線，環狀，冇地圖。（版本號未記錄）
-2. v6 試過加「真實形狀路線圖」。用戶反應：「有啲醜」，已經放棄呢個方向。（版本號未記錄）
+2. v6 試過加「真實形狀路線圖」。用戶反應：「有啲醜」，已經放棄呢個方向，唔好再撿返嚟做。（版本號未記錄）
 3. v1.0基準：多路線可切換架構，六條線，經歷咗三份第三方（ChatGPT）code review，共修正咗9個真bug＋兩輪UI細位。
 4. v1.0.1：暫停/跳站恢復漏播、倍速取消保護、行駛途中切方向teleport 三個問題修正＋建立版本號系統本身。
-5. v1.1（呢一輪，2026-09-10）：加入電腦背景播放（切換分頁後行程／車廂聲／報站繼續，手動暫停優先）＋乘客全螢幕模式重新排版（置中、放大、停站時右側減少重複資訊）。
+5. v1.1：加入電腦背景播放（切換分頁後行程／車廂聲／報站繼續，手動暫停優先）＋乘客全螢幕模式重新排版（置中、放大、停站時右側減少重複資訊）。
+6. v1.2：新增真正「全部靜音」按鈕（連車廂聲效都一齊靜音，唔止關報站），並將原有「靜音」掣改名做「靜音報站」，避免兩者混淆。
+7. v1.2.1（呢一輪，2026-09-10）：用戶第一次用真機（iPhone Safari／Android Chrome／Android三星瀏覽器）試v1.2，report「車廂聲正常，完全冇報站」。加強手機語音解鎖同keep-alive機制，並喺畫面加咗診斷提示（解鎖／播放失敗會顯示瀏覽器實際錯誤原因）。呢個修正未經真機重新確認，屬於根據已知手機瀏覽器行為做嘅嘗試性修正。
 
 部署方式：用戶自己用GitHub Pages host＋GitHub Desktop
-- 用戶明確表示唔想用Claude託管嘅Artifact網站，改用自己個GitHub帳號開GitHub Pages（免費static hosting，Public repo）。
+- 用戶明確表示唔想用Claude託管嘅Artifact網站（「我唔想用你託管網站」），改用自己個GitHub帳號開GitHub Pages（免費static hosting，Public repo）。
+- 重要（俾之後接手嘅Claude睇）：以後交付呢個project嘅更新，預設做法係俾用戶一個完整嘅index.html檔案（用SendUserFile），唔好推去Claude Artifact嗰條link做主要分發方式。
 - 用戶裝咗GitHub Desktop，clone咗個repo（叫tokyo-metro-sim）落自己部電腦，更新流程：Finder覆蓋本地index.html → GitHub Desktop「Commit to main」→「Push origin」。
-- 呢個環境未連到用戶嘅GitHub帳號，冇辦法直接幫佢push，繼續要靠佢自己嗰邊GitHub Desktop三步。
-- 用戶已經用自己部iPhone經GitHub Pages網址測試過版本號未記錄嘅早期狀態，回報「完全沒問題」——但由第二份ChatGPT review開始一直到而家嘅v1.1，全部都仲未有真機report，淨係Playwright驗證過邏輯（v1.1呢一輪額外加咗瀏覽器截圖檢查排版，但都唔係真機）。
-- 固定規則：project docs（開發日誌、交接文件）傳俾用戶睇一律用.txt副檔名，唔好再用.md——用戶試過.md傳完全下載唔到。Claude Project入面存嘅正本繼續係.md，每次交付另外存一份.txt複本再傳。
+- 呢個環境未連到用戶嘅GitHub帳號，冇辦法直接幫佢push——用戶問過「能放上git嗎」，已經回覆解釋清楚，繼續要靠佢自己嗰邊GitHub Desktop三步。如果之後Claude有官方GitHub連接工具，記得話用戶知可以唔使再手動。
+- 用戶已經用自己部iPhone經GitHub Pages網址測試過版本號未記錄嘅早期狀態（單一山手線，架構同而家完全唔同），回報「完全沒問題」——但呢個唔代表之後嘅任何一輪改動都已經真機驗證咗。2026-09-10（v1.2.1呢一輪）係第二次真正嘅真機report：用戶用iPhone Safari／Android Chrome／Android三星瀏覽器試過而家嘅多線版本，確認咗車廂聲效（Web Audio）、音響狀態UI文字喺真機都正常顯示，但報站語音（speechSynthesis）完全冇聲——呢個係目前為止真機發現嘅第一個真bug，詳見下面「現行架構」同「三份第三方review」兩節。呢次report冇提到乘客全螢幕模式／背景播放呢兩個v1.1功能有冇問題，所以呢兩樣暫時仍然算「未經真機確認」，唔好當已經驗證咗。
+- 固定規則（2026-09-10確認，之後每次都要跟，唔止係優先做法）：project docs（開發日誌、交接文件）傳俾用戶睇一律用.txt副檔名，唔好再用.md——用戶試過.md用SendUserFile傳完全下載唔到（.html就冇問題），已經明確要求「changelog和handoff之後用txt」。Claude Project入面存嘅正本繼續係.md（claude/tokyo-metro-simulator-changelog.md、claude/tokyo-metro-simulator-handoff.md），純粹每次要交低文字文件俾用戶睇嗰份要另外存一份.txt複本再SendUserFile。
+- IP考量提一提：Public repo代表個code而家任何人都search到、睇到。用戶未有再問，暫時淨係記低。
 
-現行架構重點（v1.1新增部分）：
-- phaseAt(tt)／advance(dt)／driveAudio(dt,p)／renderFrame()：由舊版loop()拆出嚟。advance(dt)逐個phase邊界一步步行，就算dt好大（背景耐唔耐先tick一次、甚至裝置瞓咗醒返嚟）都唔會漏call enter()、唔會令idx錯亂。driveAudio只負責車廂聲效。renderFrame只負責畫面。
-- bgPlayback（開關，預設true）／bgTimerId／bgLast／startBgTimer()／stopBgTimer()／bgTick()：背景播放核心，用setInterval頂替rAF（rAF喺分頁收埋時瀏覽器唔會call）。
-- visibilitychange監聽改咗：bgPlayback&&running先會用背景timer繼續播；手動暫停優先於bgPlayback；返嚟前景會即刻renderFrame()+voiceTick()同步，唔會漏報站都唔會爆隊。
-- 新增.screen包裝div：普通模式display:contents（睇落完全冇變），乘客模式先變成一張置中卡片。
-- 乘客模式CSS重寫：position:fixed;inset:0嘅全螢幕flex容器，深灰背景，.screen置中放大。版本號改做右下角細字，唔再完全隱藏。
-- 新增#hereBox／#hereCap／.here.doorFocus：停站期間右側細box淡化重複站名、突出門狀態；行駛期間標題改做「出発駅」。
+現行架構（做嘢之前建議睇實際檔案，呢度淨係摘要）
+- LINES 呢個object入面每條線一個entry：id/name/badge/topology('loop'|'linear')/color/colorDeep/dirLabels/stations/footnote。加多條線基本上只係加data，唔使改架構。
+- order()／at() 兩個function做咗拓撲通用化：loop（山手線）wrap一個環；linear（銀座線、日比谷線、東西線、有楽町線、半蔵門線）用「虛擬長度 2×(N-1)」嘅來回序列模擬去到總站自動调头。注意：linear假設條線淨係得兩個總站、冇支線；有支線嘅線（丸ノ内線方南町支線、千代田線北綾瀬支線）要另外諗過資料結構先做得。
+- effOuter(i)：forwardLeg = m>=1 && m<=N-1; return forwardLeg===outer;——m===0（返到起點總站，包括完成成個往返返嚟嗰刻）刻意唔算forwardLeg，因為呢個位物理上係「返程」嘅到達。doorSideText()、enter()嘅報站side、setDirLabel()、dirSeg手動撳掣統一用effOuter()。loop拓撲（山手線）直接原封不動返返outer。
+- 切換路線用 switchLine(id)，reset晒 idx/t/phase/outer/dirMode/pendingDir，換色、換徽章、換footnote、rebuild方向掣同起點dropdown。selLine下拉由Object.values(LINES)自動生成，加新線唔使手動改。
+- 開門方向資料格式：door:[A,B]——loop個case係[内回り側,外回り側]；linear個case係[較細編號方向嗰邊側,較大編號方向嗰邊側]。唔肯定嘅站一律null；'R?'（銀座線浅草站）、'LR'（真係兩邊都有可能）兩種軟性標記。doorSideText(st,i)處理呢四種case。
+- genId代數標記：切換路線／跳站／暫停／靜音／收埋分頁（bgPlayback關咗嗰陣先會）都會令佢增加（摺咗入stopSpeech()本身）。speak()嘅speed>1分支開頭有genId++，防止倍速取消嗰刻嘅舊utterance回呼推進新queue。
+- annReq／voicedAnn：將「畫面狀態已更新」（enter()推進idx/phase並paint()）同「必要報站真正播咗未」拆開兩個獨立概念追蹤。enter()一有新phase轉換就annReq++，唔再直接觸發announce。真正負責出聲嘅係voiceTick()（每個loop frame／每次bgTick都call），check annReq!==voicedAnn先會嘗試播，如果!running／tabHidden&&!bgPlayback／masterMute就keep住個request pending唔清（唔會assume佢自動播過），等到真係可以出聲先播——用現正（call嗰刻）嘅idx/phase重新計算報站內容，唔係捕捉緊transition嗰刻嘅舊值。
+- pendingDir：行駛途中或者停站中撳方向掣，唔會即刻outer=want;jumpTo(cur.no)（會令t/phase即刻reset去開門階段，造成teleport）。而家撳掣淨係set pendingDir（'out'/'in'），真正嘅outer／idx轉換延後到下一次prev==='close'&&p==='run'（即係下一次真正出發）先喺enter()度執行：loop拓撲用返idx=-idx；linear拓撲用S.findIndex揾返現正物理站嘅realIdx，idx = want ? realIdx : (N-1-realIdx)。setDirLabel()會喺方向標籤度加返「　→　下一程轉：XX方面」提示，dirSeg嘅按鈕加咗.pendingCSS class；switchLine()／jumpTo()都會清埋pendingDir。
+- v1.1：phaseAt(tt)／advance(dt)／driveAudio(dt,p)／renderFrame()（拆自舊版loop()）：
+  - phaseAt(tt)：純function，畀返t值計返phase（run/soon/open/dwell/close），抽出嚟方便advance()同loop()共用。
+  - advance(dt)：逐個phase邊界一步步行（whileloop，每次淨係行到下一個邊界或者dt用完為止），每跨一個邊界就call一次enter()。設計原因：dt可以好大（背景耐唔耐先tick一次，甚至裝置瞓咗醒返嚟嗰下），如果淨係一次過t+=dt計phase，會漏晒中途應該行過嘅每一個phase／站轉換，令idx錯亂——advance()保證即使dt好大，都唔會漏call任何一次enter()，idx／lapMark／pendingDir套用時機全部同細dt嗰陣一樣準確。有guard（loop次數上限200萬）做安全網，防止極端情況令while loop失控。
+  - driveAudio(dt,p)：淨係負責車廂聲效（VVVF、路軌聲、rumble、clack）嘅gain／frequency更新。if(tabHidden&&!bgPlayback) return;同masterMute會令sfx.gain嘅目標值變返0。
+  - renderFrame()：淨係負責DOM畫面更新，唔include audio或者state推進。
+  - loop(now)（rAF callback）而家淨係喺!tabHidden先做嘢：advance(dt)（如果running）→ voiceTick() → driveAudio(dt,phase) → renderFrame()，然後照舊requestAnimationFrame(loop)。
+- v1.1：bgPlayback（開關，預設true）／bgTimerId／bgLast／startBgTimer()／stopBgTimer()／bgTick()：背景播放核心，setInterval（BG_TICK_MS=300上限）頂替rAF。
+- v1.1：visibilitychange監聽：bgPlayback&&running成立就startBgTimer()；唔成立就stopBgTimer()+ac.suspend()+stopSpeech()。手動暫停（running=false）優先於bgPlayback。返嚟前景一律stopBgTimer()、重設last／clackNext，然後即刻renderFrame()+voiceTick()同步。
+- v1.1：.screen包裝div、乘客模式CSS重寫、#hereBox／#hereCap／.here.doorFocus：詳細技術細節見返舊版交接文件（.unit.passenger用position:fixed;inset:0全螢幕flex容器置中，.ver喺乘客模式改做右下角細字，停站期間右側細box淡化重複站名突出門狀態）——呢輪冇再改呢部份。
+- v1.2：masterMute（真正「全部靜音」）：獨立let masterMute=false;flag同#btnMuteAll掣。所有車廂聲效經同一個sfxmaster gain node出聲，driveAudio()將sfx.gain嘅目標由vol改做(masterMute?0:vol)一次過令全部車廂聲效淡出／回升；speak()加咗if(!voiceOn||masterMute||!window.speechSynthesis) return;；voiceTick()加咗if(masterMute) return;（同annReq/voicedAnn共用追趕機制）；buildGraph()初始化sfx.gain.value改做masterMute?0:vol；#btnMuteAllclick即時setsfx.gain.value=0+stopSpeech()，解除冇加額外code，靠現有平滑追趕／catch-up邏輯自動回復。同voiceOn/vol完全隔離，已用Playwright驗證隔離性。
+- v1.2.1新增：語音解鎖／keep-alive加強＋畫面診斷提示（voiceDiag()）：起因係用戶2026-09-10第一次真機（iPhone Safari／Android Chrome／Android三星瀏覽器）試玩，report「車廂聲正常，完全冇報站」，音響狀態顯示「運作中」，冇撳過任何靜音掣——即係話Web Audio（車廂聲）呢個系統完全冇問題，但speechSynthesis（報站語音）呢個獨立系統喺三個唔同真機瀏覽器組合上一律零聲音，冇任何JS error（因為主rAF loop冇被打斷，車廂動畫同聲效都正常）。
+  - 已知嘅手機瀏覽器speechSynthesis陷阱（呢輪針對性處理）：(1) 舊版primeSpeech()淨係喺撳「開聲」嗰一刻講一句volume=0嘅嘢嚟「解鎖」，部份引擎可能將0音量utterance當「未曾真正播過」，解鎖唔算數，之後啲靠setTimeout延遲先call嘅speak()（報站全部係咁）就會靜靜哋失敗；(2) 頁面reload或者上次殘留低嘅語音queue可能卡住咗成個speechSynthesis；(3) Chrome系瀏覽器有個已知bug，speechSynthesis靜咗一排之後會自動卡住，之後點call都出唔到聲，要定時pause()＋resume()先可以「拍醒」。
+  - primeSpeech()重寫：speechSynthesis.cancel()清走殘留queue → 分別用日文（あ）／英文（a）各一句、volume=.01（唔再係完全0）去解鎖，兩種語言分開處理 → 加咗u.onerror，解鎖都失敗會即刻voiceDiag()顯示錯誤 → 用window.__speechKeepAlive（setInterval，每8秒）確保speechSynthesis.speaking時定時pause()+resume()拍醒，用全域flag防止重複建立。
+  - nextUtt()加診斷：speechSynthesis.getVoices()長度為0（即係呢部裝置／瀏覽器根本冇裝任何TTS語音）時，voiceDiag()顯示「搵唔到任何朗讀語音」提示；u.onerror（每句實際播放失敗）會顯示e.error呢個瀏覽器俾嘅具體原因（例如not-allowed／synthesis-failed／language-unavailable）。
+  - voiceDiag(msg)：新function，寫入HTML新增嘅<div id="voiceDiag">（喺#audioSt下面，紅字，預設display:none），有訊息先顯示。
+  - 設計原則：呢輪修正係根據「已知嘅手機瀏覽器speechSynthesis quirks」做嘅有根據推測，唔係已確認嘅根本原因——Playwright headless Chromium完全冇真實TTS聲音引擎（getVoices()永遠得0），呢邊絕對驗證唔到「真係有冇聲」，只能驗證邏輯分支（診斷訊息喺兩種模擬失敗情況下都正確彈出、六線報站覆蓋率／正反完整往返冇退步、0個JS error）。必須要用戶真機重新確認：如果update咗之後仲係冇聲，畫面「開聲」掣下面應該會多咗一句紅字診斷——嗰句話嘅內容（e.error嘅具體字眼）先可以幫到手判斷真正成因，唔使再靠估。
 
-三份第三方（ChatGPT）code review：合共9個真bug＋兩輪UI細位，全部已修正並用Playwright驗證（詳細技術記錄存喺Claude Project嘅.md正本，呢度精簡列出）：
-- 第一輪（screenshot搵出）：報站次序bug、speak()排隊bug。
-- 第一份review：終點掉頭方向唔跟、暫停/靜音/收埋分頁殘留報站、轉乘名單長短唔一、停站大字搶跳。
-- 第二份review（P0/P1）：完整往返方向bug、暫停後切線/跳站仍報站、山手線每圈調頭索引錯位、有楽町線千川/要町漏轉乘。
-- 第三份review：恢復漏播（annReq/voicedAnn）、倍速舊回呼（genId）、行駛途中切方向teleport（pendingDir）、版本號系統、開發日誌更正。
-- 用戶自己提出（2026-09-10，v1.1）：電腦背景播放、乘客全螢幕模式排版。
+三份第三方（ChatGPT）code review：合共9個真bug＋兩輪UI細位，全部已修正並用Playwright驗證
 
-各線資料摘要（更正版，唔好再講「全部已填」）：
-- 山手線（30站，環狀）：内回り30站全部有據；外回り淨係田端～田町段8個站＋澀谷站有確證，其餘16站仍然係null（未確認）。
-- 銀座線（19站）：開門方向18站已填，浅草（終點總站）1個方向係null（呢個方向本身唔存在，唔算缺資料）。
-- 日比谷線（22站）、東西線（23站）、有楽町線（24站）、半蔵門線（14站）：開門方向全部已填。住吉站係全app目前唯一一個「兩個方向開唔同邊門」嘅站。
+第一輪（用戶用screenshot實測搵出嚟；已喺真iPhone確認work，版本號未記錄）
+Bug 1：enter(p)入面idx++同計算報站用嘅n=at(idx+1)次序調轉咗。修正：idx++搬去計n之前。
+Bug 2：speak()每次都即刻cancel，正常速度下轉乘名單長過8秒會俾打斷。修正：speak()喺速度×1時排隊、×3/×8保留即刻cancel；新加stopSpeech()。
 
-測試紀錄範圍（邊次測試covered邊個版本，唔好將舊版通過當成新版已驗證）：
-- 最早期（版本號未記錄）：真iPhone經GitHub Pages實測，回報「完全沒問題」——覆蓋範圍係當時嘅狀態。
-- v1.0基準／v1.0.1：淨係Playwright模擬邏輯驗證，未有真機report。
-- v1.1（呢一輪）：Playwright模擬邏輯驗證（背景播放、六線announce coverage、正反完整往返、山手線雙向調頭、pendingDir全部覆蓋），0個JS error；額外用瀏覽器截圖檢查乘客模式喺三種viewport下嘅排版。未做：真實瀏覽器長時間背景播放嘅實際聽感；iPhone/Android真機試玩，尤其背景/鎖屏播放同乘客模式觸控體驗完全未驗證。
+第一份ChatGPT review（已用Playwright驗證，未有真機report；歸入v1.0基準）
+Bug 3：直線來回路線行到終點掉頭後，方向標籤同開門邊冇跟住變。修正：加咗effOuter(i)（後尾第二份review再修正一次）。
+Bug 4：暫停／靜音／收埋分頁之後，delayed報站可能照樣播出嚟。修正：genId++摺咗入stopSpeech()本身。
+UI細位1：轉乘日英長短唔一。修正：tfCap/tfMore統一封頂3條。
+UI細位2：停站期間大字搶先跳去再下一站。修正：big/atStation改顯示緊企嗰個站。
 
-下一步可能方向（未拍板）：
-- 手機／背景真機驗證（v1.1嘅兩個功能都未經真機測試，建議下一個優先驗證項目）。
-- 開始乘車統一手勢、真正「全部靜音」（而家淨係關報站）、音響狀態文字準確化、語音佇列過時判斷重新設計。
-- 日比谷線六本木～霞關聲畫測試。
-- 加多幾條線（南北線、副都心線可直接加；丸ノ内線/千代田線/都營大江戸線要先諗支線資料結構）。
-- 執靚視覺／操作細節、諗個app大致形態。
-- 山手線外回り16站、銀座線淺草1個方向嘅開門資料仍然係null，冇資料就繼續keep null，唔好亂估。
+第二份ChatGPT review（分P0/P1兩級；已用Playwright驗證，未有真機report；歸入v1.0基準）
+P0-1　直線來回路線完成成個往返、返到起點總站嗰一刻，方向判成去程：effOuter(i)舊公式m<=N-1冇排除m===0。修正：forwardLeg = m>=1 && m<=N-1。
+P0-2　暫停後切線或跳站，仍然觸發新報站：enter(p)入面announce()等收埋入if(running&&!tabHidden){...}。注意：呢個修正本身冇錯，但留低咗一個殘餘問題——冇處理「恢復之後點補返個報站」，喺第三份review先發現並修正。
+P0-3　山手線「每圈調頭」索引錯位：舊公式idx=-idx-1差一個站。修正：idx=-idx。
+資料：有楽町線千川（Y07）／要町（Y08）已補副都心線轉乘。
+
+第三份ChatGPT review（2026-09-10，提出版本號固定要求；已用Playwright驗證，未有真機report；v1.0.1）
+恢復漏播：P0-2修正咗「暫停唔出聲」，但恢復運行之後如果冇再有新嘅phase轉換，個報站會因為p===phase已經相等而永遠播唔到。修正：拆做annReq／voicedAnn。
+倍速舊回呼：speak()嘅speed>1分支冇bumpgenId。修正：加genId++。
+行駛途中切方向teleport：修正：新增pendingDir機制。
+版本號系統：新增APP_VERSION常數＋UI顯示。
+開發日誌更正：「六條線全部有齊開門方向」呢句更正。
+
+用戶自己提出（2026-09-10，非third-party review；v1.1）
+要求1　電腦背景播放：切去第個分頁工作，行程／車廂聲／報站唔應該停。做法：bgPlayback開關＋bgTick()（setInterval）頂替rAF；advance()確保大dt唔漏站；手動暫停優先於背景播放；返嚟前景即刻renderFrame()+voiceTick()同步。
+要求2　乘客全螢幕模式排版：之前投訴「顯示屏貼晒頂，下面一大幅灰色」。做法：.unit.passenger改做position:fixed;inset:0嘅全螢幕flex容器，.screen包裝div做置中卡片；停站期間右側細box淡化重複站名、突出門狀態（.doorFocus）；版本號改做右下角細字，唔再完全隱藏。
+
+用戶自己提出（2026-09-10，非third-party review；v1.2）
+要求　真正「全部靜音」：原有「靜音」掣淨係關報站，車廂聲效冇受影響，容易誤會。做法：新增獨立masterMuteflag同#btnMuteAll掣，經sfxmaster gain node一次過控制全部車廂聲效，speak()／voiceTick()加對應gate，撳掣即時靜音（唔經平滑追趕）、解除靜音靠現有機制自動追趕；同voiceOn/vol完全隔離，唔會動到用戶原本偏好。原有「靜音」掣改名做「靜音報站」以茲區分。
+
+用戶真機report（2026-09-10，非third-party review；v1.2.1）
+Bug：真機（iPhone Safari／Android Chrome／Android三星瀏覽器）車廂聲正常，完全冇報站：呢個係目前為止第一個由真機測試（而唔係第三方AI code review或者Playwright模擬）發現嘅問題。做法：見上面「現行架構」段落嘅v1.2.1詳細技術描述——加強語音解鎖（分日英各一句、有少少音量、清殘留queue）、加keep-alive定時拍醒、加畫面診斷提示。呢個修正未經真機重新確認，屬於根據已知瀏覽器行為嘅嘗試性修正，唔可以當「已解決」，一定要跟進真機report結果。
+
+開門方向色彩區分／乘客全螢幕模式
+- paintDoorHighlight(side)：side==='L'或'LR'highlight左門；'R'／'R?'／'LR'highlight右門；淨係「肯定」case（L／R）先加flash。prefers-reduced-motion有fallback。
+- #btnPassenger：toggle .unit嘅passenger class，隱藏.ctl／.audio／.note（v1.1新增.note），嘗試requestFullscreen()，撳多次或Esc都自動同步。.ver喺v1.1改做唔隱藏（見上面架構段落）。
+
+各線資料摘要（更正版，唔好再講「全部已填」）
+- 山手線（JY01東京～JY30神田，環狀，30站）：内回り30站全部有據；外回り淨係田端～田町段8個站＋澀谷站有確證，其餘16站（高輪ゲートウェイ、品川、大崎、五反田、目黒、恵比寿、原宿、代々木、新宿、新大久保、高田馬場、目白、池袋、大塚、巣鴨、駒込）仍然係null（未確認，如實標示，冇亂估）。
+- 銀座線（G01渋谷～G19浅草，19站）：開門方向18站已填，浅草（終點總站）1個方向係null，屬於「呢個方向本身唔存在」，唔算缺資料。
+- 日比谷線（H01中目黒～H22北千住，22站）：開門方向全部22站已填。
+- 東西線（T01中野～T23西船橋，23站）：開門方向全部23站已填。
+- 有楽町線（Y01和光市～Y24新木場，24站）：開門方向全部24站已填，小竹向原（Y06）標LR。
+- 半蔵門線（Z01渋谷～Z14押上，14站）：開門方向全部14站已填，押上（Z14，總站）標LR；住吉（Z12）係全app目前唯一一個「兩個方向開唔同邊門」嘅站：door:['L','R']。
+
+測試紀錄範圍（邊次測試covered邊個版本，唔好將舊版通過當成新版已驗證）
+- 最早期（版本號未記錄）：用戶用真iPhone經GitHub Pages網址實測過，回報「完全沒問題」——覆蓋範圍係當時嘅狀態（單一山手線），唔包括之後任何一輪改動。
+- v1.0基準（第一份、第二份ChatGPT review嗰兩輪）：淨係Playwright模擬邏輯驗證，未有真機report。
+- v1.0.1：淨係Playwright模擬邏輯驗證，0個JS error；未做真實瀏覽器播放測試、未做iPhone/Android真機試玩。
+- v1.1：Playwright模擬邏輯驗證全部覆蓋，0個JS error；額外用瀏覽器截圖檢查乘客模式排版。未做：真實瀏覽器分頁長時間背景播放嘅實際聽感；iPhone/Android真機試玩完全未做。
+- v1.2：Playwright模擬邏輯驗證全部覆蓋，0個JS error。未做：真實瀏覽器/喇叭聽感確認；iPhone/Android真機試玩完全未做。
+- v1.2.1（呢一輪，2026-09-10）：用戶第一次真正用真機（iPhone Safari／Android Chrome／Android三星瀏覽器）試玩v1.2，確認咗車廂聲效同音響狀態UI喺真機顯示正常，但發現報站語音完全冇聲呢個真bug（第一個由真機而唔係模擬測試揭發嘅問題）。針對性修正之後，Playwright驗證咗診斷訊息喺兩種模擬失敗情況（冇TTS語音／播放error）都正確觸發，六線報站覆蓋率同正反完整往返冇退步，0個JS error。未驗證：修正本身係咪真係解決咗真機冇聲問題（Playwright headless完全冇真實TTS引擎，呢邊絕對驗證唔到），必須要用戶真機重新測試先知；呢次真機report亦冇提到乘客全螢幕模式／背景播放呢兩個v1.1功能，所以呢兩樣依然算未經真機確認。
+
+測試方法學嘅教訓
+- 驗證「每個站都有報站」要用page.add_init_script將window.requestAnimationFrame覆寫做冇效；announce觸發喺voiceTick()唔喺enter()，測試coverage時要記得每次advance()之後都callvoiceTick()。
+- v1.1教訓：測試advance()嘅round-trip覆蓋時，千祈唔好將「call幾多次advance(小dt)」當成「行咗幾多個站」——advance(dt)嘅dt係「秒」，唔係「站數」，一定要用advance(CYCLE)（CYCLE=45秒）先啱啱好行一個站。
+- v1.1教訓：驗證背景播放，setInterval本身喺headless測試環境未必會真正定時fire——要直接手動call bgTick()幾次（配合手動set bgLast）先啱，呢個做法只可以驗證程式邏輯分支啱唔啱，驗證唔到真實瀏覽器嘅rAF/timer節流行為。
+- v1.2教訓：驗證「靜音」呢類純audio效果，Playwright/headless環境冇真實喇叭輸出，淨係可以斷言sfx.gain.value／內部flag數值有冇變啱——「聽落去係咪真係靜咗」呢類主觀感受一定要留返俾用戶真機/真喇叭確認。
+- v1.2.1新教訓（最重要一課）：headless Playwright/Chromium完全冇真實嘅speechSynthesis語音引擎（getVoices()永遠得0），呢個環境由頭到尾都冇辦法驗證「報站真係有冇出到聲」，之前幾輪嘅「Playwright驗證咗六線announce coverage」，充其量只證明咗announce()/speak()呢啲function有冇被call到（邏輯層面），完全冇證明過瀏覽器真係有冇讀出嚟。呢個係之前幾輪報告入面一個容易誤導人嘅盲點：「announce coverage全部通過、0個JS error」呢類講法，讀落去好易俾人以為連聲音本身都驗證咗，其實唔係。之後嘅報告措辭要更加小心區分「邏輯有冇被觸發」同「真係聽唔聽到」呢兩件事，唔可以混為一談。
+- 驗證「暫停之後嘅操作」：專門試「暫停→操作→（唔再有其他狀態變化嘅情況下）恢復」，check個報站有冇補播返。
+- 驗證「行駛途中操作」（例如切方向）要專登揀一個mid-transit嘅idx（phase==='run'或'soon'），先摷到「即刻teleport」呢類bug。
+- 外部（第三方AI）code review嘅處理原則：唔照單全收，逐項用Playwright實測驗證先落手改；證實嘅先改，未證實／純屬設計意見嘅記低但唔急住做。
+- 開發日誌嘅措辭要留意「全部／已齊」呢類字眼：只要有一個站係null，都唔應該講「全部有齊」。
+
+外部review意見嘅評估
+- 第一份（表格形式，v1.0基準）：真係值得做嘅淨係「開門方向色彩區分」同「乘客全螢幕模式」，已完成。
+- 第二份（ChatGPT code review，分P0/P1，v1.0基準）：三個P0全部修正；一個資料遺漏已修正。
+- 第三份（ChatGPT code review，2026-09-10，v1.0.1）：兩個bug＋一個操作設計問題全部核實並修正；建立版本號系統。
+- 用戶自己提出（2026-09-10，v1.1）：背景播放＋乘客模式排版，兩項都做咗。
+- 用戶自己提出（2026-09-10，v1.2）：真正「全部靜音」，已完成。
+- 用戶真機report（2026-09-10，v1.2.1）：報站冇聲bug，已做嘗試性修正，未經真機確認。
+
+IP／侵權考量（用戶問過，未有結論，暫時擱置）
+Public repo代表個code而家任何人都search到、睇到，同之前「純私人」已經唔同——用戶未有再問，暫時淨係記低。
+
+下一步可能方向（未拍板，睇用戶點揀）
+- （最優先）確認v1.2.1報站冇聲修正真係work咗未：用戶更新完之後要再用真機試一次；如果仲係冇聲，一定要留意畫面「開聲」掣下面有冇跳出新嘅紅字診斷訊息，嗰句話（尤其e.error嘅具體字眼）係下一步診斷嘅關鍵線索，唔好再單憑「有冇聲」呢個結果本身去估原因。
+- 乘客全螢幕模式、背景播放呢兩個v1.1功能都仲未經真機確認（呢次真機report冇提到），如果報站問題搞掂咗，呢兩樣應該係下一個優先驗證項目。
+- 開始乘車（統一手勢啟動音響＋行程）、音響狀態文字分開確認車廂聲／日文語音／英文語音、語音佇列嘅完整「站/階段過時判斷」重新設計。
+- 日比谷線六本木→神谷町→虎ノ門Hills→霞關聲畫測試（呢個都要真機／真喇叭先驗證到）。
+- 加多幾條線：冇支線嘅線（南北線、副都心線）可以直接加，零架構改動；有支線嘅線（丸ノ内線、千代田線、都營大江戸線）要先諗過拓撲資料結構。
+- 執靚視覺／操作細節：小螢幕控制列排版、無障礙/語言一致性，中低優先，未開始。
+- 諗個「app」大致形態（依家係一頁切換線，定係想要個首頁揀線）。
+- 山手線外回り16站、銀座線淺草1個方向嘅開門資料仍然係null，如果用戶有意欲可以之後再問佢有冇資料補；冇資料就繼續keep null，唔好亂估。

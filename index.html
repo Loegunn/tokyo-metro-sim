@@ -264,6 +264,7 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
   <div class="audio" id="audioBar">
     <button id="btnSound">🔊 開聲</button>
     <div class="st" id="audioSt">撳「開聲」啟動車廂聲同報站。通咗會即刻「叮」一聲。</div>
+    <div class="st" id="voiceDiag" style="display:none;color:var(--alert)"></div>
   </div>
 
   <div class="ctl">
@@ -306,9 +307,12 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
    v1.0）；v1.0.1＝暫停/跳站恢復漏播、倍速取消漏保護、行駛途中切
    方向teleport 三個bug修正＋版本號系統本身；v1.1＝加入電腦背景
    播放（切換分頁後行程／車廂聲／報站繼續）＋乘客全螢幕模式重新
-   排版（置中、放大、停站時右側減少重複資訊）；v1.2（呢一輪）＝
-   新增真正「全部靜音」按鈕（連車廂聲都一齊收埋，唔止關報站）。 */
-const APP_VERSION='v1.2';
+   排版（置中、放大、停站時右側減少重複資訊）；v1.2＝新增真正
+   「全部靜音」按鈕（連車廂聲都一齊收埋，唔止關報站）；v1.2.1
+   （呢一輪）＝真機report「有車廂聲但完全冇報站把口」，加強手機
+   語音解鎖／keep-alive，並加咗螢幕上診斷提示（如果仲係冇聲，畫面
+   會顯示瀏覽器實際嘅錯誤原因，唔會再係一片靜默）。 */
+const APP_VERSION='v1.2.1';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -698,19 +702,48 @@ function buildGraph(){
   clackNext=ac.currentTime+.4;
 }
 
+function voiceDiag(msg){
+  const el=$('voiceDiag'); if(!el) return;
+  el.style.display='block'; el.innerHTML=msg;
+}
 let speechPrimed=false;
 function primeSpeech(){
-  /* iOS Safari 淨係俾「用戶手指嗰下撳落」呢個瞬間直接call speak()先真係會出聲，
-     之後嗰啲靠setTimeout延遲先call嘅speak()（例如報站，delay 700~1100ms）
-     喺iOS會靜靜哋失敗，冇錯誤、都冇聲。所以要喺呢個撳掣嘅同一個瞬間，
-     搶閘講一句冇聲量嘅嘢，「解鎖」咗之後成個phase啲報站先會出到聲。 */
+  /* iOS Safari／部份Android瀏覽器淨係俾「用戶手指嗰下撳落」呢個瞬間
+     直接call speak()先真係會出聲，之後嗰啲靠setTimeout延遲先call嘅
+     speak()（例如報站，delay 700~1100ms）有機會靜靜哋失敗，冇錯誤、
+     都冇聲。所以要喺呢個撳掣嘅同一個瞬間，搶閘講返日／英兩句嘢
+     「解鎖」，之後成個phase啲報站先有機會出到聲。
+     2026-09-10真機report：車廂聲（Web Audio）正常但完全冇報站把口，
+     兩個可能成因一齊處理——(1) 之前淨係prime一句、淨係得0音量，
+     部份引擎可能將0音量utterance當「無聲、唔算真正播過」，唔會真
+     正解鎖；(2) 頁面reload或者上次殘留嘅queue卡住咗speechSynthesis
+     ——所以呢度先cancel()清一清，再用返有少少音量嘅日／英各一句
+     去prime，兩種語言分開解鎖。如果連呢句都error，就即刻喺螢幕度
+     顯示返瀏覽器嘅實際錯誤原因，等下次唔使再靠估。 */
   if(speechPrimed||!window.speechSynthesis) return;
   speechPrimed=true;
   try{
-    const u=new SpeechSynthesisUtterance(' ');
-    u.volume=0; u.rate=10;
-    speechSynthesis.speak(u);
-  }catch(e){}
+    speechSynthesis.cancel();
+    [['ja-JP','あ'],['en-US','a']].forEach(([lang,text])=>{
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang=lang; u.volume=.01; u.rate=10;
+      u.onerror=e=>voiceDiag(`⚠️ 報站語音解鎖失敗（語言：${lang}，原因：${e.error||'未知'}）。呢部裝置可能未裝呢種語言嘅朗讀語音，或者瀏覽器封鎖緊speechSynthesis。`);
+      speechSynthesis.speak(u);
+    });
+  }catch(e){ voiceDiag(`⚠️ 語音解鎖時發生錯誤：${e.message||e}`); }
+  /* keep-alive：Chrome系瀏覽器有個已知bug，speechSynthesis靜咗一段
+     時間之後就會卡住／自動暫停，之後再speak()都冇聲——定時pause()
+     再resume()一次可以「拍醒」返佢，冇壞影響（冇嘢講緊嗰陣呢兩個
+     call都係no-op）。 */
+  if(!window.__speechKeepAlive){
+    window.__speechKeepAlive=setInterval(()=>{
+      try{
+        if(window.speechSynthesis&&speechSynthesis.speaking){
+          speechSynthesis.pause(); speechSynthesis.resume();
+        }
+      }catch(e){}
+    },8000);
+  }
 }
 function initAudio(){
   try{
@@ -841,15 +874,29 @@ function nextUtt(){
   const [lang,text]=queue.shift();
   const u=new SpeechSynthesisUtterance(text);
   u.lang=lang; u.rate=rate; u.pitch=lang==='ja-JP'?1.05:1;
-  const vo=speechSynthesis.getVoices().find(x=>x.lang.startsWith(lang.slice(0,2)));
+  const allVoices=speechSynthesis.getVoices();
+  const vo=allVoices.find(x=>x.lang.startsWith(lang.slice(0,2)));
   if(vo) u.voice=vo;
+  if(!allVoices.length){
+    // 呢部裝置／瀏覽器根本冇任何朗讀語音——唔止揀唔到岩嘅voice，
+    // 係無論點都出唔到聲，同「有裝但揀唔中」係兩回事，要分清楚講。
+    voiceDiag('⚠️ 呢部裝置搵唔到任何朗讀語音（TTS voice），所以日／英報站都出唔到聲——車廂聲（VVVF、路軌聲）唔受影響。可以去手機系統設定確認有冇裝語音包／朗讀功能。');
+  }
   liveUtterances.push(u);                 // 強引用，播完先放走
   const done=()=>{
     liveUtterances=liveUtterances.filter(x=>x!==u);
     if(myGen!==genId) return;             // 舊代嘅回呼，唔准再推進新queue
     nextUtt();
   };
-  u.onend=done; u.onerror=done;
+  u.onend=done;
+  u.onerror=e=>{
+    // 真機report「有車廂聲但完全冇報站」之後新加：唔再靜靜哋吞咗個
+    // error，將瀏覽器實際嘅失敗原因（例如'not-allowed'／'synthesis-
+    // failed'／'language-unavailable'）顯示喺螢幕，等下次真機測試
+    // 唔使靠估。
+    voiceDiag(`⚠️ 報站語音播放失敗（語言：${lang}，原因：${e.error||'未知'}）。`);
+    done();
+  };
   speechSynthesis.speak(u);
 }
 if(window.speechSynthesis){
