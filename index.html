@@ -410,8 +410,11 @@ const TOZAI_STATIONS=[
    同銀座線／丸ノ内線嗰種「唔同站名但官方認做轉乘」嘅安排一樣。JR方面，官方頁面
    淨係寫「JR線」冇講邊條，池袋／飯田橋／市ケ谷／有楽町／新木場呢幾個站嘅具體JR
    線名係跟返其他線嘅車站資料（例如山手線自己個池袋entry）交叉比對出嚟，唔係
-   官方呢頁講明。開門方向：**用戶未提供資料，全部24個站暫時標null（未確認）**，
-   跟返之前加線嘅慣例，唔會亂估。 */
+   官方呢頁講明。**千川（Y07）／要町（Y08）官方站碼其實同時係Y07/F07、Y08/F08，
+   即係呢兩個站同小竹向原～池袋之間嗰段都係有楽町線／副都心線共用軌道嘅站，個別
+   官方頁面已經Fetch過核實，兩個站都補咗副都心線做轉乘**（第三方review提出呢個
+   遺漏，已核實屬實並修正）。開門方向：全部24個站已由用戶提供資料填齊，小竹向原
+   （Y06）因為多股道轉乘結構標「LR」（左／右皆有可能）。 */
 const YURAKUCHO_STATIONS=[
 ['01','和光市','わこうし','Wakoshi',[['東武東上線',C.tobu],['副都心線',C.fuku]],['L','L']],
 ['02','地下鉄成増','ちかてつなります','Chikatetsu-narimasu',[],['R','R']],
@@ -419,8 +422,8 @@ const YURAKUCHO_STATIONS=[
 ['04','平和台','へいわだい','Heiwadai',[],['R','R']],
 ['05','氷川台','ひかわだい','Hikawadai',[],['L','L']],
 ['06','小竹向原','こたけむかいはら','Kotake-mukaihara',[['西武有楽町線',C.seibu],['副都心線',C.fuku]],['LR','LR']],
-['07','千川','せんかわ','Senkawa',[],['R','R']],
-['08','要町','かなめちょう','Kanamecho',[],['R','R']],
+['07','千川','せんかわ','Senkawa',[['副都心線',C.fuku]],['R','R']],
+['08','要町','かなめちょう','Kanamecho',[['副都心線',C.fuku]],['R','R']],
 ['09','池袋','いけぶくろ','Ikebukuro',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['丸ノ内線',C.maru],['副都心線',C.fuku],['西武池袋線',C.seibu],['東武東上線',C.tobu]],['R','R']],
 ['10','東池袋','ひがしいけぶくろ','Higashi-ikebukuro',[],['R','R']],
 ['11','護国寺','ごこくじ','Gokokuji',[],['R','R']],
@@ -448,8 +451,9 @@ const YURAKUCHO_STATIONS=[
    邊條線，具體JR線名（三越前係經新日本橋站嘅中央・総武線；錦糸町係直接喺
    同一個站嘅総武線）係跟公開嘅乘換路線資料查返嚟，唔係官方呢頁講明。渋谷、
    永田町、青山一丁目、九段下、大手町呢幾個同其他線共站嘅transfer，跟返其他
-   線自己個entry交叉比對（換走呢條線自己嗰個名）。開門方向：**用戶未提供
-   資料，全部14個站暫時標null（未確認）**，跟返之前加線嘅慣例，唔會亂估。 */
+   線自己個entry交叉比對（換走呢條線自己嗰個名）。開門方向：全部14個站已由
+   用戶提供資料填齊，住吉（Z12）兩個方向開唔同邊門（往押上右側／往澀谷左側，
+   已用effOuter()喺掉頭前後分別實測驗證過），押上（Z14，總站）依月台標「LR」。 */
 const HANZOMON_STATIONS=[
 ['01','渋谷','しぶや','Shibuya',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['銀座線',C.ginza],['副都心線',C.fuku],['東急東横線',C.toyoko],['東急田園都市線',C.denen],['京王井の頭線',C.inokashira]],['R','R']],
 ['02','表参道','おもてさんどう','Omote-sando',[['銀座線',C.ginza],['千代田線',C.chiyoda]],['R','R']],
@@ -549,7 +553,13 @@ function effOuter(i){
   if(CUR.topology!=='linear') return outer;
   const N=S.length, per=Math.max(2*(N-1),1);
   const m=((i%per)+per)%per;
-  return (m<=N-1)===outer;
+  /* m=0永遠代表「返到起點總站」——呢個位置可以係「啱啱出發」（第一次）
+     或者「行完成個往返、返嚟起點」（完成一圈之後）兩種情況，兩種physically
+     都應該算「返程」（跟返程嗰個方向嚟到呢個站），唔應該當佢屬於去程。
+     所以去程（forwardLeg）淨係 m=1..N-1，m=0本身唔算入去程——修正咗
+     「完成整個往返、索引返到循環起點時，仍會將抵達方向判成去程」嗰個bug。 */
+  const forwardLeg = m>=1 && m<=N-1;
+  return forwardLeg===outer;
 }
 
 /* ═══════════ 音響 ═══════════ */
@@ -700,13 +710,20 @@ function speak(list){
 function nextUtt(){
   if(!queue.length){ speaking=false; return; }
   speaking=true;
+  const myGen=genId; // 記低呢句嘅代——如果播緊嗰陣stopSpeech()令代數變咗，
+                      // 就代表呢句已經作廢，即使佢個onend/onerror遲咗先到
+                      // 都唔可以再攞嚟推進（可能已經係新排緊隊）嗰個queue
   const [lang,text]=queue.shift();
   const u=new SpeechSynthesisUtterance(text);
   u.lang=lang; u.rate=rate; u.pitch=lang==='ja-JP'?1.05:1;
   const vo=speechSynthesis.getVoices().find(x=>x.lang.startsWith(lang.slice(0,2)));
   if(vo) u.voice=vo;
   liveUtterances.push(u);                 // 強引用，播完先放走
-  const done=()=>{ liveUtterances=liveUtterances.filter(x=>x!==u); nextUtt(); };
+  const done=()=>{
+    liveUtterances=liveUtterances.filter(x=>x!==u);
+    if(myGen!==genId) return;             // 舊代嘅回呼，唔准再推進新queue
+    nextUtt();
+  };
   u.onend=done; u.onerror=done;
   speechSynthesis.speak(u);
 }
@@ -806,7 +823,14 @@ function enter(p){
      咁報站同畫面先會用返同一個、啱嘅idx。 */
   if(prev==='close'&&p==='run'){
     idx++;
-    if(dirMode==='alt'&&++lapMark>=S.length){lapMark=0;outer=!outer;idx=-idx-1;setDirLabel();}
+    /* 山手線「每圈調頭」：order()喺loop拓撲底下，唔論外回り定内回り都會
+       重新以東京（S[0]）做錨點0（[S0,S(N-1),S(N-2)...]咁重排），所以純粹
+       將idx取負冇用——舊公式idx=-idx-1差一個站，會令調頭一刻嘅「現正
+       所在站」錯計成上一個站（例如喺東京調頭，錯計成有樂町）。正確做法
+       係idx=-idx（唔使-1），先會啱啱好將「現正所在站」對返做返同一個
+       physical站（例如東京調頭之後，現正所在站仍然係東京，下一站先係
+       神田／有樂町，睇邊個方向）。 */
+    if(dirMode==='alt'&&++lapMark>=S.length){lapMark=0;outer=!outer;idx=-idx;setDirLabel();}
     strip();
   }
   const n=at(idx+1);
@@ -820,18 +844,26 @@ function enter(p){
   const side = effOuter(idx+1) ? n.door[1] : n.door[0];
   const sideJp = side==='L' ? '左側の' : side==='R' ? '右側の' : '';
   const sideEn = side==='L' ? ' on the left side' : side==='R' ? ' on the right side' : '';
-  if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
-  if(p==='soon') announce(
-    `まもなく、${n.kanji}、${n.kanji}です。`+(tfCap.length?`${tfCap.map(x=>x[0]).join('、')}${tfMore?'ほか':''}は、お乗り換えです。`:''),
-    `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}${tfMore?', and other lines':''}.`:''));
-  if(p==='open'){ airRelease(.13); doorAir();
-    announce(`${n.kanji}、${n.kanji}です。${sideJp}ドアが開きます。ご注意ください。`,
-              `This is ${n.rom}. The doors${sideEn} will open.`,700); }
-  if(p==='close'){ chimeDoor();
-    const g=genId;
-    setTimeout(()=>{ if(g===genId) speak([['ja-JP','ドアが閉まります。ご注意ください。'],
-                          ['en-US','The doors are closing. Please watch your step.']]); },400);
-    setTimeout(doorAir,1500); }
+  /* 暫停（running=false）／收埋分頁（tabHidden）期間，切線或跳站會
+     令phase／idx即刻reset，令上面嘅p!==phase成立、繼續行到呢度——但
+     呢種情況只應該更新畫面（等預覽跟得住你揀嘅路線／站），唔應該
+     自動播新語音同音效。所以真正「觸發報站／開關門聲效」呢一段收埋
+     入呢個check，keep返idx／phase／paint()喺任何情況都會更新。 */
+  if(running&&!tabHidden){
+    if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
+    if(p==='soon') announce(
+      `まもなく、${n.kanji}、${n.kanji}です。`+(tfCap.length?`${tfCap.map(x=>x[0]).join('、')}${tfMore?'ほか':''}は、お乗り換えです。`:''),
+      `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}${tfMore?', and other lines':''}.`:''));
+    if(p==='open'){ airRelease(.13); doorAir();
+      announce(`${n.kanji}、${n.kanji}です。${sideJp}ドアが開きます。ご注意ください。`,
+                `This is ${n.rom}. The doors${sideEn} will open.`,700); }
+    if(p==='close'){ chimeDoor();
+      const g=genId;
+      setTimeout(()=>{ if(g===genId) speak([['ja-JP','ドアが閉まります。ご注意ください。'],
+                            ['en-US','The doors are closing. Please watch your step.']]); },400);
+      setTimeout(()=>{ if(g===genId) doorAir(); },1500); // 呢個sfx以前冇代次保護，切線／暫停之後都會殘留播出嚟
+    }
+  }
   paint();
 }
 
@@ -877,7 +909,20 @@ function loop(now){
 }
 
 /* ═══ 操作 ═══ */
-function setDirLabel(){ $('dirLabel').textContent=CUR.dirLabels[effOuter(idx+1)?0:1]; }
+function setDirLabel(){
+  const eff=effOuter(idx+1);
+  $('dirLabel').textContent=CUR.dirLabels[eff?0:1];
+  /* 自動折返之後effOuter會變、但dirMode／揀開嗰粒掣本身唔會自動跟住郁——
+     每次update方向標籤都順便同步返方向掣嘅aria-pressed，等佢反映返
+     「而家實際行緊邊個方向」，唔會出現折返完，個掣仲揀住去程嗰粒嘅怪現象。 */
+  if(dirMode!=='alt'){
+    const seg=$('dirSeg');
+    if(seg) [...seg.children].forEach(x=>{
+      if(x.dataset.dir==='out'||x.dataset.dir==='in')
+        x.setAttribute('aria-pressed', String((x.dataset.dir==='out')===eff));
+    });
+  }
+}
 function buildDirSeg(){
   let html=`<button data-dir="out" aria-pressed="true">${CUR.dirLabels[0]}</button>`+
            `<button data-dir="in" aria-pressed="false">${CUR.dirLabels[1]}</button>`;
@@ -912,8 +957,12 @@ $('dirSeg').onclick=e=>{
   const b=e.target.closest('button'); if(!b) return;
   dirMode=b.dataset.dir; lapMark=0;
   [...e.currentTarget.children].forEach(x=>x.setAttribute('aria-pressed',x===b));
+  /* 比較要用effOuter（而家實際行緊嗰個方向），唔可以淨係比較初始嘅
+     outer——直線來回路線折返咗之後，outer本身唔會變，如果淨係同outer
+     比較，撳落一粒其實同「現正方向」一致嘅掣，都會誤判做「要切方向」，
+     搞出一次冇必要嘅jumpTo（打斷緊緊嘅報站、無端端跳咗一下畫面）。 */
   if(dirMode!=='alt'){ const want=dirMode==='out';
-    if(want!==outer){ const cur=at(idx+1); outer=want; jumpTo(cur.no); } }
+    if(want!==effOuter(idx+1)){ const cur=at(idx+1); outer=want; jumpTo(cur.no); } }
   setDirLabel(); paint();
 };
 $('spdSeg').onclick=e=>{
