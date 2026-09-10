@@ -263,7 +263,9 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 
   <div class="audio" id="audioBar">
     <button id="btnSound">🔊 開聲</button>
-    <button id="btnTestVoice" title="即場測試手機報站語音，會喺下面顯示逐步結果">🔎 測試報站</button>
+    <!-- 平時收埋（睇落同冇呢粒掣一樣乾淨）；報站語音真係出事嗰陣，
+         showTestButton() 先會將佢顯示返出嚟，方便當場攞診斷資料。 -->
+    <button id="btnTestVoice" style="display:none" title="即場測試報站語音，會喺下面顯示逐步結果">🔎 測試報站</button>
     <div class="st" id="audioSt">撳「開聲」啟動車廂聲同報站。通咗會即刻「叮」一聲。</div>
     <div class="st" id="voiceDiag" style="display:none;color:var(--alert)"></div>
   </div>
@@ -321,8 +323,10 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
    訊息改為保留最近幾條連時間同分頁狀態；v1.2.4（呢一輪）＝用戶實測
    confirm「點一下其他地方就冇問題」，證實瀏覽器要嘅係新鮮嘅用戶動作、
    重試冇用——所以取消咗v1.2.3嗰個會不停重試（兼不停「叮」）嘅做法，
-   改為被擋即刻停手、掛一句人話提示，撳畫面任何位置就即刻恢復兼補播。 */
-const APP_VERSION='v1.2.4';
+   改為被擋即刻停手、掛一句人話提示，撳畫面任何位置就即刻恢復兼補播；
+   v1.2.5（呢一輪）＝「🔎 測試報站」改為平時收埋、報站語音出事先自動
+   現身，等正常玩嗰陣個介面乾淨，但有事時其他人自己都攞到診斷資料。 */
+const APP_VERSION='v1.2.5';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -739,6 +743,13 @@ function voiceDiag(msg,kind){
    淨係睇到最尾嗰個錯誤，睇唔到之前發生過乜、亦唔知當時分頁係咪收埋咗。
    而家改做保留最近幾條，每條都有時間同「當時分頁收埋咗未」，一張圖
    就睇晒成個經過。 */
+/* showTestButton（v1.2.5新增）：「🔎 測試報站」平時收埋，淨係喺報站
+   語音真係出事嗰陣先自動現身。咁樣正常玩嘅時候個介面乾乾淨淨、唔會
+   見到一粒好似開發工具咁嘅嘢；但萬一其他人玩嗰陣話「冇報站聲」，
+   佢哋自己就即刻有粒掣攞到齊晒診斷資料，唔使再由零開始靠估。 */
+function showTestButton(){
+  const b=$('btnTestVoice'); if(b) b.style.display='';
+}
 /* showGesturePrompt（v1.2.4新增）：被擋嗰陣唔再嘔一堆紅色技術log出嚟
    （嗰啲字對你嚟講冇用，仲好似出咗大事咁），改為一句人話＋一粒掣。
    撳個提示本身、撳粒掣、或者撳畫面任何一處，都一樣會恢復。 */
@@ -752,6 +763,7 @@ function showGesturePrompt(){
     '<b style="color:var(--uguisu-deep)">撳一下畫面任何位置就會恢復 →</b>'+
     '<button id="btnResumeVoice" style="padding:3px 10px">恢復報站</button></span>';
   const b=$('btnResumeVoice'); if(b) b.onclick=restoreSpeechByGesture;
+  showTestButton();
 }
 /* restoreSpeechByGesture：用「用戶啱啱撳嗰一下」嘅授權即刻解鎖，收返
    個提示，然後補播返「現正」應該有嗰句（用返annReq/voicedAnn同一套
@@ -769,6 +781,7 @@ function diagPush(msg){
   diagLog.push(`<span style="opacity:.6">${t}${document.hidden?' · 分頁收埋咗':''}</span>　${msg}`);
   if(diagLog.length>5) diagLog.shift();
   voiceDiag(diagLog.join('<br>'),'warn');
+  showTestButton();          // 報站出咗事，畀返粒診斷掣出嚟
 }
 /* ═══ 語音清單載入（v1.2.2新增）═══
    2026-09-10真機screenshot證實：iPhone Safari喺報站嗰刻，
@@ -797,7 +810,8 @@ function startVoicePolling(){
       voiceDiag(ja?'':`ℹ️ 呢部裝置有 ${v.length} 個朗讀語音，但入面冇日文語音，日文嗰段會用預設語音讀（英文照常）。`, 'info');
     }else if(voicePolls>40){ // 約20秒都仲係0個
       clearInterval(voicePollId); voicePollId=null;
-      voiceDiag('⚠️ 等咗20秒，呢部裝置嘅瀏覽器仍然報告「0個朗讀語音」。可以撳下面粒「🔎 測試報站」睇下實際情況。','warn');
+      voiceDiag('⚠️ 等咗20秒，呢部裝置嘅瀏覽器仍然報告「0個朗讀語音」。可以撳埋隔籬粒「🔎 測試報站」睇下實際情況。','warn');
+      showTestButton();
     }
   },500);
 }
