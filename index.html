@@ -263,6 +263,7 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 
   <div class="audio" id="audioBar">
     <button id="btnSound">🔊 開聲</button>
+    <button id="btnTestVoice" title="即場測試手機報站語音，會喺下面顯示逐步結果">🔎 測試報站</button>
     <div class="st" id="audioSt">撳「開聲」啟動車廂聲同報站。通咗會即刻「叮」一聲。</div>
     <div class="st" id="voiceDiag" style="display:none;color:var(--alert)"></div>
   </div>
@@ -309,10 +310,16 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
    播放（切換分頁後行程／車廂聲／報站繼續）＋乘客全螢幕模式重新
    排版（置中、放大、停站時右側減少重複資訊）；v1.2＝新增真正
    「全部靜音」按鈕（連車廂聲都一齊收埋，唔止關報站）；v1.2.1
-   （呢一輪）＝真機report「有車廂聲但完全冇報站把口」，加強手機
-   語音解鎖／keep-alive，並加咗螢幕上診斷提示（如果仲係冇聲，畫面
-   會顯示瀏覽器實際嘅錯誤原因，唔會再係一片靜默）。 */
-const APP_VERSION='v1.2.1';
+   ＝真機report「有車廂聲但完全冇報站把口」，加強手機語音解鎖／
+   keep-alive，並加咗螢幕上診斷提示；v1.2.2（呢一輪）＝真機screenshot
+   證實iPhone Safari報站嗰刻getVoices()返0個語音，改為poll住等語音
+   清單load好（唔再靠唔可靠嘅voiceschanged），修正咗誤導性嘅「冇裝
+   語音」訊息，並加咗「🔎 測試報站」即場診斷掣；v1.2.3（呢一輪）＝
+   實測攞到真正錯誤碼not-allowed（＝瀏覽器autoplay政策擋住報站語音，
+   唔係冇語音），針對性做咗：每次用戶郁下就重新解鎖、前台被擋會即刻
+   重新解鎖並重試、後台被擋改為keep住pending返到前台先補播、診斷
+   訊息改為保留最近幾條連時間同分頁狀態。 */
+const APP_VERSION='v1.2.3';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -636,6 +643,11 @@ let bgTimerId=null,bgLast=0;
    flag做gate，同埋annReq/voicedAnn個機制令靜音期間錯過嘅報站，
    解除之後會啱啱好補播返「現正」嗰句，唔會漏、唔會播舊嘢。 */
 let masterMute=false;
+/* speechHiddenBlocked（v1.2.3新增）：分頁收埋咗嗰陣，瀏覽器用autoplay
+   政策擋住speechSynthesis（錯誤碼not-allowed）。呢個flag令voiceTick()
+   喺仲收埋住嘅時候唔好一直重試（否則每個tick試一次、洗版兼嘥電），
+   個報站request會keep住pending，返到前台先補播返「現正」嗰句。 */
+let speechHiddenBlocked=false;
 const $=id=>document.getElementById(id);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* 環狀路線（山手線）：一圈行晒 N 個站，wrap 返轉頭。
@@ -702,9 +714,61 @@ function buildGraph(){
   clackNext=ac.currentTime+.4;
 }
 
-function voiceDiag(msg){
+function voiceDiag(msg,kind){
+  /* kind：'warn'（紅，預設）／'ok'（綠）／'info'（灰）。傳空字串＝收埋。
+     v1.2.2改：舊版淨係識「顯示」唔識「清返」，搞到語音遲啲先load好之後
+     嗰句「搵唔到語音」嘅舊訊息仲繼續掛喺度，誤導人以為一直都冇語音。 */
   const el=$('voiceDiag'); if(!el) return;
+  if(!msg){ el.style.display='none'; el.innerHTML=''; return; }
   el.style.display='block'; el.innerHTML=msg;
+  el.style.color = kind==='ok' ? 'var(--uguisu-deep)' : kind==='info' ? 'var(--soft)' : 'var(--alert)';
+}
+/* diagLog（v1.2.3新增）：舊版係「最後一句冚晒前面」，所以一張screenshot
+   淨係睇到最尾嗰個錯誤，睇唔到之前發生過乜、亦唔知當時分頁係咪收埋咗。
+   而家改做保留最近幾條，每條都有時間同「當時分頁收埋咗未」，一張圖
+   就睇晒成個經過。 */
+let diagLog=[];
+function diagPush(msg){
+  const t=new Date().toTimeString().slice(0,8);
+  diagLog.push(`<span style="opacity:.6">${t}${document.hidden?' · 分頁收埋咗':''}</span>　${msg}`);
+  if(diagLog.length>5) diagLog.shift();
+  voiceDiag(diagLog.join('<br>'),'warn');
+}
+/* ═══ 語音清單載入（v1.2.2新增）═══
+   2026-09-10真機screenshot證實：iPhone Safari喺報站嗰刻，
+   speechSynthesis.getVoices() 返返嚟係「0個語音」。iPhone本身梗係有
+   朗讀語音嘅，所以真正嘅問題唔係「冇裝語音」，而係 iOS Safari 一個
+   出名嘅行為——getVoices() 一開始會返空array，語音清單係之後先
+   非同步load好，而 voiceschanged 事件喺 iOS 上出名唔可靠（可能遲、
+   可能唔fire）。語音清單空嘅時候，utterance 揀唔到 voice，好多引擎
+   就會靜靜哋唔出聲（唔會報error）——啱啱好對得上「有車廂聲、冇報站、
+   又冇任何error」呢個現象。
+   所以唔可以再靠 voiceschanged 一個事件，要自己poll住等佢load好。 */
+let voiceList=[], voicePolls=0, voicePollId=null;
+function refreshVoices(){
+  if(!window.speechSynthesis) return [];
+  try{ voiceList=speechSynthesis.getVoices()||[]; }catch(e){ voiceList=[]; }
+  return voiceList;
+}
+function startVoicePolling(){
+  if(voicePollId||!window.speechSynthesis) return;
+  voicePollId=setInterval(()=>{
+    voicePolls++;
+    const v=refreshVoices();
+    if(v.length){
+      clearInterval(voicePollId); voicePollId=null;
+      const ja=v.some(x=>x.lang&&x.lang.toLowerCase().startsWith('ja'));
+      voiceDiag(ja?'':`ℹ️ 呢部裝置有 ${v.length} 個朗讀語音，但入面冇日文語音，日文嗰段會用預設語音讀（英文照常）。`, 'info');
+    }else if(voicePolls>40){ // 約20秒都仲係0個
+      clearInterval(voicePollId); voicePollId=null;
+      voiceDiag('⚠️ 等咗20秒，呢部裝置嘅瀏覽器仍然報告「0個朗讀語音」。可以撳下面粒「🔎 測試報站」睇下實際情況。','warn');
+    }
+  },500);
+}
+function pickVoice(lang){
+  const list=voiceList.length?voiceList:refreshVoices();
+  const p=lang.slice(0,2).toLowerCase();
+  return list.find(x=>x.lang&&x.lang.toLowerCase().startsWith(p))||null;
 }
 let speechPrimed=false;
 function primeSpeech(){
@@ -722,12 +786,17 @@ function primeSpeech(){
      顯示返瀏覽器嘅實際錯誤原因，等下次唔使再靠估。 */
   if(speechPrimed||!window.speechSynthesis) return;
   speechPrimed=true;
+  refreshVoices(); startVoicePolling();   // v1.2.2：即刻攞一次，攞唔到就poll住等
   try{
     speechSynthesis.cancel();
     [['ja-JP','あ'],['en-US','a']].forEach(([lang,text])=>{
       const u=new SpeechSynthesisUtterance(text);
       u.lang=lang; u.volume=.01; u.rate=10;
-      u.onerror=e=>voiceDiag(`⚠️ 報站語音解鎖失敗（語言：${lang}，原因：${e.error||'未知'}）。呢部裝置可能未裝呢種語言嘅朗讀語音，或者瀏覽器封鎖緊speechSynthesis。`);
+      /* 解鎖句失敗唔使每次都寫一行——被擋（not-allowed）呢個情況，真正
+         有用嗰句訊息由報站嗰邊嘅onerror負責寫，呢度再寫就會洗版，反而
+         迫走咗有用嘅資料。淨係報告其他比較罕見嘅原因。 */
+      u.onerror=e=>{ const w=e.error||'未知';
+        if(w!=='canceled'&&w!=='interrupted'&&w!=='not-allowed') diagPush(`語音解鎖失敗（${lang}，${w}）。`); };
       speechSynthesis.speak(u);
     });
   }catch(e){ voiceDiag(`⚠️ 語音解鎖時發生錯誤：${e.message||e}`); }
@@ -772,8 +841,26 @@ function audioStatus(err){
     st.innerHTML='<b>瀏覽器封鎖緊聲音。</b>如果你係喺預覽視窗（iframe）入面睇，請下載個 HTML 檔再 double-click 用瀏覽器直接開。';
   }
 }
-addEventListener('pointerdown',initAudio);
-addEventListener('keydown',initAudio);
+/* touchPrime（v1.2.3新增）：Chrome系瀏覽器用autoplay政策gate住
+   speechSynthesis，實測攞到嘅錯誤碼係not-allowed。單靠開頭「解鎖」
+   一次唔夠——所以而家每次用戶郁下（撳畫面／撳掣／撳鍵盤）都會順手
+   喺嗰一刻講一句聽唔到嘅嘢，令授權keep住係「新鮮」。刻意唔call
+   cancel()（唔可以斬斷緊講緊嗰句報站），亦有4秒節流，唔會撳極都prime。 */
+let lastPrime=0;
+function touchPrime(){
+  if(!window.speechSynthesis||masterMute) return;
+  const now=Date.now();
+  if(now-lastPrime<4000) return;
+  lastPrime=now;
+  try{
+    const u=new SpeechSynthesisUtterance('.');
+    u.volume=.01; u.rate=10;
+    window.__primeKeep=u;            // 強引用，防止俾GC食咗
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+addEventListener('pointerdown',()=>{ initAudio(); touchPrime(); });
+addEventListener('keydown',()=>{ initAudio(); touchPrime(); });
 
 /* Page Visibility（v1.1改）：舊行為係「一收埋分頁就即刻suspend AudioContext
    同stopSpeech」；而家先睇bgPlayback呢個開關——開咗（而且running緊）
@@ -794,6 +881,7 @@ document.addEventListener('visibilitychange',()=>{
     }
   }else{
     stopBgTimer();
+    speechHiddenBlocked=false;       // v1.2.3：返到前台，解除「後台被擋」狀態，等下面voiceTick()補播
     if(ac&&ac.state!=='running'&&built) ac.resume();
     last=performance.now();          // 避免返嚟嗰下 dt 爆錶
     if(ac) clackNext=ac.currentTime+.4;   // 重新對路軌聲嘅排程時基
@@ -874,14 +962,16 @@ function nextUtt(){
   const [lang,text]=queue.shift();
   const u=new SpeechSynthesisUtterance(text);
   u.lang=lang; u.rate=rate; u.pitch=lang==='ja-JP'?1.05:1;
-  const allVoices=speechSynthesis.getVoices();
-  const vo=allVoices.find(x=>x.lang.startsWith(lang.slice(0,2)));
-  if(vo) u.voice=vo;
-  if(!allVoices.length){
-    // 呢部裝置／瀏覽器根本冇任何朗讀語音——唔止揀唔到岩嘅voice，
-    // 係無論點都出唔到聲，同「有裝但揀唔中」係兩回事，要分清楚講。
-    voiceDiag('⚠️ 呢部裝置搵唔到任何朗讀語音（TTS voice），所以日／英報站都出唔到聲——車廂聲（VVVF、路軌聲）唔受影響。可以去手機系統設定確認有冇裝語音包／朗讀功能。');
-  }
+  /* v1.2.2：改用pickVoice()／voiceList（會poll住等語音load好），唔再
+     每次直接call getVoices()——iOS Safari早期call會返0個，之前就係
+     因為咁，喺報站嗰刻誤判成「呢部裝置冇裝任何語音」並且將個誤導
+     訊息掛咗喺螢幕度。真正冇語音定係只係未load好，交返俾polling同
+     「🔎 測試報站」粒掣去分辨，呢度唔再落結論。 */
+  const vo=pickVoice(lang);
+  // 揀voice本身有可能掟error（例如個voice object已經過期／唔係真正嘅
+  // SpeechSynthesisVoice），唔可以連累成句報站播唔到——揀唔到就照樣
+  // 用lang交返俾瀏覽器自己決定。
+  if(vo){ try{ u.voice=vo; }catch(e){} }
   liveUtterances.push(u);                 // 強引用，播完先放走
   const done=()=>{
     liveUtterances=liveUtterances.filter(x=>x!==u);
@@ -890,11 +980,32 @@ function nextUtt(){
   };
   u.onend=done;
   u.onerror=e=>{
-    // 真機report「有車廂聲但完全冇報站」之後新加：唔再靜靜哋吞咗個
-    // error，將瀏覽器實際嘅失敗原因（例如'not-allowed'／'synthesis-
-    // failed'／'language-unavailable'）顯示喺螢幕，等下次真機測試
-    // 唔使靠估。
-    voiceDiag(`⚠️ 報站語音播放失敗（語言：${lang}，原因：${e.error||'未知'}）。`);
+    /* v1.2.3：真機／桌面實測攞到嘅錯誤碼係 not-allowed——即係「瀏覽器
+       擋咗」，唔係「冇語音」、亦唔係「引擎壞咗」。Chrome系瀏覽器會用
+       autoplay政策去gate speechSynthesis：要頁面有用戶互動過先俾出聲，
+       而且分頁收埋咗（後台）嗰陣好多時直接唔俾出聲。所以呢度分兩種
+       情況處理，唔可以一律當成永久失敗： */
+    const why=e.error||'未知';
+    if(why==='canceled'||why==='interrupted'){ done(); return; }  // 我哋自己cancel嘅，正常
+    if(why==='not-allowed'){
+      if(tabHidden||document.hidden){
+        /* 分頁收埋咗俾瀏覽器擋——唔係真係播唔到，係而家唔俾播。
+           將個報站request還原做「未播」，並且記住而家係被擋狀態，
+           等返到前台先補播返「現正」嗰句（用返annReq/voicedAnn同一套
+           追趕機制，唔會爆隊、唔會播舊嘢）。 */
+        speechHiddenBlocked=true;
+        voicedAnn=annReq-1;
+        diagPush('報站俾瀏覽器擋咗（not-allowed）——分頁喺後台。返到前台會自動補播。');
+      }else{
+        /* 前台都被擋＝用戶互動授權過期／未夠。即刻重新「解鎖」一次，
+           下一句報站會再試。 */
+        speechPrimed=false; primeSpeech();
+        voicedAnn=annReq-1;
+        diagPush('報站俾瀏覽器擋咗（not-allowed）。已即時重新解鎖，下一句會再試；如果一直擋，撳一下畫面任何位置就會回復。');
+      }
+      done(); return;
+    }
+    diagPush(`報站語音播放失敗（語言：${lang}，原因：${why}）。`);
     done();
   };
   speechSynthesis.speak(u);
@@ -1041,6 +1152,7 @@ function voiceTick(){
   if(!running) return;
   if(tabHidden&&!bgPlayback) return; // 背景播放開咗先可以喺收埋分頁時繼續出聲
   if(masterMute) return; // 全部靜音期間keep住request pending，解除先補播返「現正」嗰句
+  if(speechHiddenBlocked&&tabHidden) return; // 已知後台被擋，唔好逐個tick重試洗版，等返前台先
   voicedAnn=annReq;
   const p=phase, n=at(idx+1);
   const tfCap=n.tf.slice(0,3), tfMore=n.tf.length>3;
@@ -1208,6 +1320,51 @@ function switchLine(id){
   buildDirSeg(); buildSelStart(); setDirLabel(); strip(); paint();
 }
 $('btnSound').onclick=initAudio;
+/* ═══ 「🔎 測試報站」（v1.2.2新增）═══
+   真機report「有車廂聲、冇報站、又冇任何error」呢個組合，單靠估分唔到
+   究竟係邊一種failure，所以要有個即場測試掣，將關鍵狀態直接寫返出嚟：
+   - 呢粒掣係「用戶手指撳落嗰一刻」同步call speak()，冇任何setTimeout。
+     如果撳呢粒掣有聲、但自動報站冇聲 → 即係「延遲call speak()喺手機
+     會俾封鎖」呢類問題，要改報站嘅觸發方式。
+   - 如果連呢粒掣都冇聲，就要睇埋下面逐項顯示：語音數量、有冇fire
+     onstart（＝引擎有冇真係開始讀）、有冇fire onend、有冇error、
+     speaking/pending/paused三個狀態——onstart有fire但完全冇聲，通常
+     係音訊路由／靜音掣／同Web Audio爭audio session；onstart根本冇
+     fire，就係utterance入咗queue但引擎唔肯開工。 */
+$('btnTestVoice').onclick=()=>{
+  if(!window.speechSynthesis){ voiceDiag('⚠️ 呢個瀏覽器完全冇speechSynthesis呢個功能。','warn'); return; }
+  const t0=Date.now(), log=[];
+  const show=()=>voiceDiag('<b>🔎 報站語音測試</b><br>'+log.join('<br>'),'info');
+  const v=refreshVoices();
+  const ja=v.filter(x=>x.lang&&x.lang.toLowerCase().startsWith('ja')).length;
+  const en=v.filter(x=>x.lang&&x.lang.toLowerCase().startsWith('en')).length;
+  log.push(`語音數量：${v.length}（日文 ${ja} 個、英文 ${en} 個）`);
+  log.push(`車廂聲AudioContext：${ac?ac.state:'未開'}`);
+  show();
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance('つぎは、東京、東京です。');
+    u.lang='ja-JP'; u.volume=1; u.rate=1;
+    const vo=v.find(x=>x.lang&&x.lang.toLowerCase().startsWith('ja'))||v[0]||null;
+    if(vo){
+      try{ u.voice=vo; log.push(`用緊語音：${vo.name}（${vo.lang}）`); }
+      catch(err){ log.push(`揀語音失敗（${err.message||err}），改用瀏覽器預設`); }
+    }
+    else log.push('用緊語音：冇揀到（交返俾瀏覽器預設）');
+    u.onstart=()=>{ log.push(`✅ ${Date.now()-t0}ms：引擎話開始讀緊（如果呢刻仲係一啲聲都冇，就係部機將把聲收咗埋，唔係個app冇叫佢讀）`); show(); };
+    u.onend  =()=>{ log.push(`✅ ${Date.now()-t0}ms：讀完`); show(); };
+    u.onerror=e=>{ log.push(`❌ ${Date.now()-t0}ms：出錯 — ${e.error||'未知'}`); show(); };
+    window.__testUtt=u;                       // 強引用，防止俾GC食咗
+    speechSynthesis.speak(u);
+    log.push(`已經叫咗瀏覽器讀（speaking=${speechSynthesis.speaking}／pending=${speechSynthesis.pending}／paused=${speechSynthesis.paused}）`);
+    show();
+    setTimeout(()=>{
+      log.push(`⏱ 3秒後：speaking=${speechSynthesis.speaking}／pending=${speechSynthesis.pending}／paused=${speechSynthesis.paused}`);
+      if(!/開始讀緊/.test(log.join(''))) log.push('⚠️ 由頭到尾都冇fire過onstart＝引擎根本冇開工，唔係音量問題。');
+      show();
+    },3000);
+  }catch(e){ log.push(`❌ 直接掟咗個錯誤出嚟：${e.message||e}`); show(); }
+};
 $('btnBg').onclick=e=>{
   bgPlayback=!bgPlayback;
   e.target.setAttribute('aria-pressed',bgPlayback);
