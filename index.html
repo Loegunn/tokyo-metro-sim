@@ -318,8 +318,11 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
    實測攞到真正錯誤碼not-allowed（＝瀏覽器autoplay政策擋住報站語音，
    唔係冇語音），針對性做咗：每次用戶郁下就重新解鎖、前台被擋會即刻
    重新解鎖並重試、後台被擋改為keep住pending返到前台先補播、診斷
-   訊息改為保留最近幾條連時間同分頁狀態。 */
-const APP_VERSION='v1.2.3';
+   訊息改為保留最近幾條連時間同分頁狀態；v1.2.4（呢一輪）＝用戶實測
+   confirm「點一下其他地方就冇問題」，證實瀏覽器要嘅係新鮮嘅用戶動作、
+   重試冇用——所以取消咗v1.2.3嗰個會不停重試（兼不停「叮」）嘅做法，
+   改為被擋即刻停手、掛一句人話提示，撳畫面任何位置就即刻恢復兼補播。 */
+const APP_VERSION='v1.2.4';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -648,6 +651,15 @@ let masterMute=false;
    喺仲收埋住嘅時候唔好一直重試（否則每個tick試一次、洗版兼嘥電），
    個報站request會keep住pending，返到前台先補播返「現正」嗰句。 */
 let speechHiddenBlocked=false;
+/* speechNeedsGesture（v1.2.4新增）：桌面實測confirm咗——前台被擋
+   （not-allowed）之後，「點一下畫面任何地方」就即刻正常。即係話瀏覽器
+   要嘅係一個「新鮮嘅用戶動作」，唔係我哋重試幾多次就會俾。v1.2.3個
+   做法係被擋就即刻重試，結果係：重試又被擋、又重試……除咗洗版之外，
+   仲會每次都「叮」一聲（因為announce()開頭就chimePing()），變成得個
+   叮聲冇人聲——啱啱好就係之前report嘅「得叮咚叮咚」。
+   所以而家改做：一被擋就停手，掛住個「撳一下就恢復」嘅提示，等你真係
+   撳嗰一下先再開工。 */
+let speechNeedsGesture=false;
 const $=id=>document.getElementById(id);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* 環狀路線（山手線）：一圈行晒 N 個站，wrap 返轉頭。
@@ -727,6 +739,30 @@ function voiceDiag(msg,kind){
    淨係睇到最尾嗰個錯誤，睇唔到之前發生過乜、亦唔知當時分頁係咪收埋咗。
    而家改做保留最近幾條，每條都有時間同「當時分頁收埋咗未」，一張圖
    就睇晒成個經過。 */
+/* showGesturePrompt（v1.2.4新增）：被擋嗰陣唔再嘔一堆紅色技術log出嚟
+   （嗰啲字對你嚟講冇用，仲好似出咗大事咁），改為一句人話＋一粒掣。
+   撳個提示本身、撳粒掣、或者撳畫面任何一處，都一樣會恢復。 */
+function showGesturePrompt(){
+  const el=$('voiceDiag'); if(!el) return;
+  el.style.display='block'; el.style.color='var(--ink)';
+  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;'+
+    'background:#FFF6E0;border:1px solid #E8D9A8;border-radius:6px;padding:6px 10px">'+
+    '<b>🔇 報站語音俾瀏覽器暫停咗</b>'+
+    '<span style="color:var(--soft)">瀏覽器規定要有新嘅操作先俾出聲。</span>'+
+    '<b style="color:var(--uguisu-deep)">撳一下畫面任何位置就會恢復 →</b>'+
+    '<button id="btnResumeVoice" style="padding:3px 10px">恢復報站</button></span>';
+  const b=$('btnResumeVoice'); if(b) b.onclick=restoreSpeechByGesture;
+}
+/* restoreSpeechByGesture：用「用戶啱啱撳嗰一下」嘅授權即刻解鎖，收返
+   個提示，然後補播返「現正」應該有嗰句（用返annReq/voicedAnn同一套
+   機制，唔會爆隊、唔會播返舊嘢）。 */
+function restoreSpeechByGesture(){
+  if(!speechNeedsGesture) return;
+  speechNeedsGesture=false;
+  lastPrime=0; touchPrime();     // 借呢一下手勢重新解鎖（繞過4秒節流）
+  diagLog=[]; voiceDiag('');
+  voiceTick();
+}
 let diagLog=[];
 function diagPush(msg){
   const t=new Date().toTimeString().slice(0,8);
@@ -859,8 +895,11 @@ function touchPrime(){
     speechSynthesis.speak(u);
   }catch(e){}
 }
-addEventListener('pointerdown',()=>{ initAudio(); touchPrime(); });
-addEventListener('keydown',()=>{ initAudio(); touchPrime(); });
+/* 任何一下操作都會：開音響 → 借呢一下解鎖語音 → 如果之前被擋住咗，
+   即刻恢復兼補播。呢個就係你發現「點一下其他地方就冇問題」嗰件事，
+   而家變成app自己識做。 */
+addEventListener('pointerdown',()=>{ initAudio(); restoreSpeechByGesture(); touchPrime(); });
+addEventListener('keydown',()=>{ initAudio(); restoreSpeechByGesture(); touchPrime(); });
 
 /* Page Visibility（v1.1改）：舊行為係「一收埋分頁就即刻suspend AudioContext
    同stopSpeech」；而家先睇bgPlayback呢個開關——開咗（而且running緊）
@@ -997,11 +1036,12 @@ function nextUtt(){
         voicedAnn=annReq-1;
         diagPush('報站俾瀏覽器擋咗（not-allowed）——分頁喺後台。返到前台會自動補播。');
       }else{
-        /* 前台都被擋＝用戶互動授權過期／未夠。即刻重新「解鎖」一次，
-           下一句報站會再試。 */
-        speechPrimed=false; primeSpeech();
+        /* 前台被擋＝瀏覽器要一個「新鮮嘅用戶動作」先俾出聲。重試係冇用
+           嘅（實測confirm），所以即刻停手、keep住個報站pending，掛個
+           提示等用戶撳一下——撳完會即刻解鎖兼補播返「現正」嗰句。 */
+        speechNeedsGesture=true;
         voicedAnn=annReq-1;
-        diagPush('報站俾瀏覽器擋咗（not-allowed）。已即時重新解鎖，下一句會再試；如果一直擋，撳一下畫面任何位置就會回復。');
+        showGesturePrompt();
       }
       done(); return;
     }
@@ -1153,6 +1193,7 @@ function voiceTick(){
   if(tabHidden&&!bgPlayback) return; // 背景播放開咗先可以喺收埋分頁時繼續出聲
   if(masterMute) return; // 全部靜音期間keep住request pending，解除先補播返「現正」嗰句
   if(speechHiddenBlocked&&tabHidden) return; // 已知後台被擋，唔好逐個tick重試洗版，等返前台先
+  if(speechNeedsGesture) return;             // 等緊用戶撳一下先再開工——重試冇用，仲會不停「叮」
   voicedAnn=annReq;
   const p=phase, n=at(idx+1);
   const tfCap=n.tf.slice(0,3), tfMore=n.tf.length>3;
