@@ -20,13 +20,49 @@ body{background:var(--room);color:var(--ink);
   display:flex;align-items:center;justify-content:center;padding:20px}
 .unit{position:relative;width:min(1020px,100%);background:var(--paper);border-radius:6px;
   box-shadow:0 18px 44px -26px rgba(0,0,0,.55);overflow:hidden}
-.unit.passenger{width:100vw;max-width:100vw}
-.unit.passenger .ctl,.unit.passenger .audio{display:none}
-.passenger-toggle{position:absolute;top:9px;right:9px;z-index:10;width:30px;height:30px;
+/* .screen：普通模式下純粹係透明包裝（display:contents令佢喺layout度
+   「隱形」，bar/main/tf/map同冇呢層包裝時排版完全一樣）；乘客模式先
+   會將佢變返一個有實體box嘅置中卡片，見返落面 .unit.passenger .screen。 */
+.screen{display:contents}
+.unit.passenger{
+  position:fixed;inset:0;width:100vw;height:100vh;max-width:100vw;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;padding:28px;box-sizing:border-box;
+  background:#1B1D1F;border-radius:0;box-shadow:none;overflow:auto;z-index:1000;
+}
+.unit.passenger .ctl,.unit.passenger .audio,.unit.passenger .note{display:none}
+.unit.passenger .screen{
+  display:block;width:min(1300px,94vw);flex:0 0 auto;
+  border-radius:12px;overflow:hidden;background:var(--paper);
+  box-shadow:0 24px 60px -28px rgba(0,0,0,.6);
+}
+/* 版本號喺乘客模式唔隱藏（保持「低調可查閱」），改做全螢幕右下角
+   一粒細細嘅浮動字，唔佔主要資訊區。 */
+.unit.passenger .ver{
+  display:block;position:fixed;bottom:10px;right:16px;
+  background:transparent;color:#6B716C;font-size:9px;padding:0;z-index:1001;
+}
+.passenger-toggle{position:absolute;top:9px;right:9px;z-index:1010;width:30px;height:30px;
   border-radius:50%;background:rgba(0,0,0,.28);color:#fff;border:none;font-size:14px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;
   transition:opacity .2s;padding:0}
 .passenger-toggle:hover,.passenger-toggle:focus-visible{opacity:1}
+.unit.passenger .passenger-toggle{position:fixed;top:16px;right:16px;opacity:.75;width:36px;height:36px;font-size:16px}
+/* 乘客模式：顯示屏隨視窗適度放大（保留橫長比例），方便遠距離觀看 */
+.unit.passenger .next{padding:32px 34px 22px}
+.unit.passenger .name{font-size:clamp(38px,6vw,92px)}
+.unit.passenger .kana{font-size:16px}
+.unit.passenger .romaji{font-size:19px}
+.unit.passenger .here{padding:24px 24px 20px}
+.unit.passenger .here .h-name{font-size:36px}
+.unit.passenger .map{padding:26px 0 10px}
+.unit.passenger .rail{height:112px}
+.unit.passenger .track{top:31px}
+.unit.passenger .dot{margin-top:29px}
+.unit.passenger .train{top:3px}
+.unit.passenger .s-name{font-size:13.5px}
+.unit.passenger .bar{padding:12px 24px}
+.unit.passenger .bar-line{font-size:19px}
 
 .bar{background:var(--uguisu);display:flex;align-items:center;gap:13px;padding:9px 18px}
 .jy{width:29px;height:29px;border-radius:50%;background:#fff;color:var(--uguisu-deep);
@@ -64,9 +100,18 @@ body{background:var(--room);color:var(--ink);
   display:flex;flex-direction:column;gap:3px;min-width:0;overflow:hidden}
 .here .cap{font-size:10.5px;font-weight:700;letter-spacing:.24em;color:var(--soft)}
 .here .h-name{font-size:31px;font-weight:900;letter-spacing:.04em;line-height:1.1;margin-top:2px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:font-size .15s}
 .here .h-rom{font-size:12px;color:var(--soft);letter-spacing:.06em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 開門／停站期間，大字（.name）已經顯示緊同一個站，右側細box唔應該
+   再重複放一個一樣大嘅站名做重點——呢陣淡化返個站名、突出開門側／
+   車門狀態先啱。行駛／接近期間（doorFocus冇加）就保持原本大細，
+   因為嗰陣細box顯示緊「出発駅」（同大字唔同站），唔算重複。 */
+.here.doorFocus .h-name{font-size:17px;color:var(--soft);font-weight:700;letter-spacing:.02em}
+.here.doorFocus .h-rom{display:none}
+.here.doorFocus .door{margin-top:6px;padding-top:8px}
+.here.doorFocus .d-txt{font-size:14px}
+.here.doorFocus .d-side{font-size:13px}
 .door{margin-top:auto;padding-top:12px;display:flex;align-items:center;gap:10px}
 .d-txt{font-size:11.5px;font-weight:700;color:var(--soft);line-height:1.4}
 .d-txt.open{color:var(--alert)}
@@ -136,9 +181,9 @@ button[aria-pressed="true"],button.on{background:var(--uguisu-deep);border-color
 input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 .note{padding:8px 18px 15px;font-size:10.5px;color:#8A9096;line-height:1.6;background:#F7F8F5}
 .note b{color:var(--uguisu-deep)}
+.bgHint{font-size:10px;color:#9AA09B}
 .ver{padding:0 18px 8px;font-size:9.5px;color:#B7BCB2;background:#F7F8F5;text-align:right;
   letter-spacing:.04em;user-select:text}
-.unit.passenger .ver{display:none}
 
 @media (max-width:760px){
   body{padding:0}.unit{border-radius:0}
@@ -158,6 +203,7 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 <body>
 <div class="unit">
   <button class="passenger-toggle" id="btnPassenger" title="乘客模式（隱藏控制項，全螢幕顯示）">⛶</button>
+  <div class="screen">
   <div class="bar">
     <div class="jy" id="jyBadge">JY</div><div class="bar-line" id="lineName">山手線</div>
     <div class="bar-dir" id="dirLabel">外回り</div>
@@ -175,8 +221,8 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
         <div class="plate"><div class="l" id="plateL">JY</div><div class="n" id="nNo">02</div></div>
       </div>
     </div>
-    <div class="here">
-      <div class="cap">ただいまの駅</div>
+    <div class="here" id="hereBox">
+      <div class="cap" id="hereCap">ただいまの駅</div>
       <div class="h-name" id="cName">東京</div>
       <div class="h-rom" id="cRom">Tokyo · JY01</div>
       <div class="door">
@@ -209,6 +255,7 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
       </div>
     </div>
   </div>
+  </div>
 
   <div class="audio" id="audioBar">
     <button id="btnSound">🔊 開聲</button>
@@ -217,6 +264,9 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 
   <div class="ctl">
     <button id="btnRun" class="on">▶ 運行中</button>
+    <div class="grp"><span class="lbl">背景播放</span>
+      <button id="btnBg" aria-pressed="true" title="開啟後，切換到其他分頁工作時，行程、車廂聲同報站會繼續；手動暫停仍然優先，暫停咗唔會因為返嚟分頁就自動繼續">開啟</button>
+      <span class="bgHint">切換分頁後繼續播放</span></div>
     <div class="grp"><span class="lbl">路線</span><select id="selLine"></select></div>
     <div class="grp"><span class="lbl">方向</span>
       <div class="seg" id="dirSeg"></div></div>
@@ -247,9 +297,11 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
    存檔唔使跟住升，以正式交付做單位。呢個常數係全個程式讀版本號嘅
    唯一source，介面顯示（#appVer）同交接文件都要對得住呢度。
    v1.0＝2026-09-10之前歷次交付嘅基準（冇正式版本號紀錄，追溯訂為
-   v1.0）；v1.0.1＝呢一輪：暫停/跳站恢復漏播、倍速取消漏保護、行駛
-   途中切方向teleport 三個bug修正＋呢個版本號系統本身。 */
-const APP_VERSION='v1.0.1';
+   v1.0）；v1.0.1＝暫停/跳站恢復漏播、倍速取消漏保護、行駛途中切
+   方向teleport 三個bug修正＋版本號系統本身；v1.1（呢一輪）＝加入
+   電腦背景播放（切換分頁後行程／車廂聲／報站繼續）＋乘客全螢幕
+   模式重新排版（置中、放大、停站時右側減少重複資訊）。 */
+const APP_VERSION='v1.1';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -555,6 +607,14 @@ let pendingDir=null;
    running又冇hide先播現正嗰個phase，唔會恢復咗都漏播、亦唔會因為暫停
    期間phase靜靜哋變咗就當自動播過。 */
 let annReq=0,voicedAnn=-1;
+/* bgPlayback（v1.1新增）：「切換分頁後繼續播放」開關，預設開。開咗
+   之後，收埋分頁（tabHidden）唔會再attribute直接suspend AudioContext／
+   stopSpeech——改由bgTick()（setInterval）頂替rAF去推進t／phase／
+   音效／報站。首次要真正出到聲仍然要用戶自己撳過「開聲」先（瀏覽器
+   autoplay政策），呢個開關淨係決定「已經開緊聲嗰陣，收埋分頁會唔會
+   停」。 */
+let bgPlayback=true;
+let bgTimerId=null,bgLast=0;
 const $=id=>document.getElementById(id);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* 環狀路線（山手線）：一圈行晒 N 個站，wrap 返轉頭。
@@ -665,16 +725,30 @@ function audioStatus(err){
 addEventListener('pointerdown',initAudio);
 addEventListener('keydown',initAudio);
 
-/* Page Visibility：背景分頁自動 suspend，返嚟先 resume＋重新對時基準 */
+/* Page Visibility（v1.1改）：舊行為係「一收埋分頁就即刻suspend AudioContext
+   同stopSpeech」；而家先睇bgPlayback呢個開關——開咗（而且running緊）
+   就唔suspend、唔stopSpeech，改用setInterval（bgTick）頂替rAF令行程／
+   音效／報站繼續；手動暫停（running=false）優先於背景播放，暫停緊
+   嗰陣即使bgPlayback開咗都照舊suspend，唔會因為切走分頁而變成自動
+   繼續行。返嚟前景嗰陣一律停走背景timer、重新對時基，並即刻補一次
+   畫面／報站，等你返嚟即刻見到、聽到同現正行程一致嘅狀態，唔使等。 */
 document.addEventListener('visibilitychange',()=>{
   tabHidden=document.hidden;
   if(tabHidden){
-    if(ac&&ac.state==='running') ac.suspend();
-    stopSpeech();
+    if(bgPlayback&&running){
+      startBgTimer();
+    }else{
+      stopBgTimer();
+      if(ac&&ac.state==='running') ac.suspend();
+      stopSpeech();
+    }
   }else{
+    stopBgTimer();
     if(ac&&ac.state!=='running'&&built) ac.resume();
     last=performance.now();          // 避免返嚟嗰下 dt 爆錶
     if(ac) clackNext=ac.currentTime+.4;   // 重新對路軌聲嘅排程時基
+    renderFrame();                   // 即刻同步返畫面，唔使等落一個rAF先慢慢追
+    voiceTick();                     // 補返返嚟嗰下應該有嘅報站（如果背景冇播）
   }
 });
 
@@ -702,7 +776,7 @@ function clackPair(a0,amp,rf){
   noiseBurst(a0+.16*rf,.09,amp*.72,700,1.4); noiseBurst(a0+.215*rf,.11,amp*.58,400,1.2);
 }
 function scheduleClacks(){
-  if(!ac||ac.state!=='running'||v<.06||!running||tabHidden) return;
+  if(!ac||ac.state!=='running'||v<.06||!running||(tabHidden&&!bgPlayback)) return;
   const now=ac.currentTime;
   if(clackNext<now) clackNext=now+.03;
   const interval=(1.35/(0.18+v*1.5))/Math.max(speed,1);
@@ -825,6 +899,13 @@ function paint(){
   $('nNo').textContent=big.no;
   $('cName').textContent=cur.kanji; $('cName').title=cur.kanji;
   $('cRom').textContent=`${cur.rom} · ${CUR.badge}${cur.no}`;
+  /* 停站（開門／停留）期間，大字（.name）已經顯示緊呢個站，右側細box
+     唔應該再重複放一個一樣大嘅站名做重點——加返.doorFocus淡化站名、
+     突出開門側／車門狀態。行駛／接近期間細box顯示緊「出発駅」（同
+     大字唔同站），改返個標題字眼，唔好用「ただいまの駅」暗示緊列車
+     停喺嗰度。 */
+  $('hereCap').textContent = stopped ? 'ただいまの駅' : '出発駅';
+  $('hereBox').classList.toggle('doorFocus', atStation);
   const eb=$('eyebrow');
   eb.classList.toggle('hot',phase==='soon'||phase==='close');
   eb.textContent=phase==='run'?'つぎは':phase==='soon'?'まもなく':phase==='close'?'まもなく発車':atStation?'ただいま':'つぎは';
@@ -893,7 +974,8 @@ function voiceTick(){
      嘅idx／phase播返適用嗰句——資源到位先播，唔會恢復咗漏晒，亦
      唔會因為暫停期間phase靜靜哋變咗就當自動播過。 */
   if(annReq===voicedAnn) return;
-  if(!(running&&!tabHidden)) return;
+  if(!running) return;
+  if(tabHidden&&!bgPlayback) return; // 背景播放開咗先可以喺收埋分頁時繼續出聲
   voicedAnn=annReq;
   const p=phase, n=at(idx+1);
   const tfCap=n.tf.slice(0,3), tfMore=n.tf.length>3;
@@ -916,20 +998,53 @@ function voiceTick(){
   }
 }
 
-let last=performance.now();
-function loop(now){
-  const dt=Math.min((now-last)/1000,.25)*speed; last=now;
-  if(running&&!tabHidden){ t+=dt; if(t>=CYCLE) t-=CYCLE; }
-  const p=t<B.run?'run':t<B.soon?'soon':t<B.open?'open':t<B.dwell?'dwell':'close';
-  enter(p);
-  voiceTick(); // 就算呢個frame enter()冇轉phase，都要check吓係咪有pending緊嘅報站等running返嚟先播
-
+/* ═══ v1.1：時間推進／音效／畫面三件事拆開 ═══
+   舊版全部揼晒喺loop()一個function度，靠rAF一路細細個dt咁行，冇問題；
+   但rAF喺分頁收埋（tabHidden）嗰陣，瀏覽器根本唔會再call，所以背景
+   播放一定要另外揾方法推進時間——用setInterval（bgTick）。但setInterval
+   之間隔嘅時間可能好大（例如背景幾分鐘先先tick一次，甚至裝置瞓咗
+   醒返嚟先觸發一次好大嘅dt），如果淨係set一次`t+=dt`就直接算phase，
+   會漏晒中途應該行過嘅每一個phase／站，令idx錯亂。所以拆出嚟嘅
+   advance(dt)會逐個phase邊界咁一步步行，唔理dt幾大都唔會漏call
+   enter()、亦唔會令idx跳錯——但因為annReq/voicedAnn個機制，就算行
+   足幾百次enter()，voiceTick()都淨係會播返「現正」嗰句，唔會將沿途
+   錯過晒嘅報站一次過爆晒出嚟。 */
+function phaseAt(tt){
+  return tt<B.run?'run':tt<B.soon?'soon':tt<B.open?'open':tt<B.dwell?'dwell':'close';
+}
+function advance(dt){
+  let guard=0;
+  while(dt>1e-6&&guard++<2000000){
+    const nextBound = t<B.run?B.run : t<B.soon?B.soon : t<B.open?B.open : t<B.dwell?B.dwell : CYCLE;
+    const step=Math.min(dt,Math.max(nextBound-t,0));
+    t+=step; dt-=step;
+    if(t>=CYCLE-1e-9) t-=CYCLE;
+    enter(phaseAt(t));
+    if(step<=1e-9&&dt>1e-6){ t+=1e-6; dt-=1e-6; } // 保險：避開浮點誤差令step長期為0
+  }
+}
+function driveAudio(dt,p){
   vPrev=v;
   if(p==='run'){ const e=t/T.run; v=e<.34?Math.pow(e/.34,.7):1-(e-.34)*.12; }
   else if(p==='soon'){ const e=(t-B.run)/T.soon; v=Math.max(0,Math.pow(1-e,1.6)*.88); }
   else v=0;
   accel=(v-vPrev)/Math.max(dt,1e-4);
-
+  if(!ac||!sfx||ac.state!=='running') return;
+  if(tabHidden&&!bgPlayback) return;
+  sfx.gain.value+=(vol-sfx.gain.value)*.1;
+  const on=running?1:0;
+  rollGain.gain.value+=((Math.pow(v,1.4)*.5*on)-rollGain.gain.value)*.08;
+  rollFilt.frequency.value=220+v*900;
+  const sing=Math.min(1,Math.abs(accel)*7), f=58+v*330;
+  vvA.frequency.value=f; vvB.frequency.value=f*1.49; vvFilt.frequency.value=f*2.4+300;
+  vvGain.gain.value+=((sing*.055*on)-vvGain.gain.value)*.09;
+  rumbleGain.gain.value=.03+v*.02;
+  scheduleClacks();
+}
+function renderFrame(){
+  // 淨係負責畫面（路軌位置、車頭位置、門動畫）——背景（tabHidden）唔
+  // 使call，冇人睇緊，慳返效能；返去前景嗰陣會補call一次同步返畫面。
+  const p=phase;
   let prog;
   if(p==='run'||p==='soon'){ const e=t/B.soon; prog=reduce?e:e*e*(3-2*e); } else prog=1;
   const pos=(idx+prog)*GAP;
@@ -937,25 +1052,50 @@ function loop(now){
   $('train').style.left=pos+'px';
   rail.querySelectorAll('.stop').forEach(e=>
     e.classList.toggle('on',Number(e.dataset.k)===(prog===1?idx+1:idx)));
-
   let a=0;
   if(p==='open') a=(t-B.soon)/T.open;
   else if(p==='dwell') a=1;
   else if(p==='close') a=1-(t-B.dwell)/T.close;
   doors(Math.max(0,Math.min(1,a)));
+}
 
-  if(ac&&sfx&&ac.state==='running'&&!tabHidden){
-    sfx.gain.value+=(vol-sfx.gain.value)*.1;
-    const on=running?1:0;
-    rollGain.gain.value+=((Math.pow(v,1.4)*.5*on)-rollGain.gain.value)*.08;
-    rollFilt.frequency.value=220+v*900;
-    const sing=Math.min(1,Math.abs(accel)*7), f=58+v*330;
-    vvA.frequency.value=f; vvB.frequency.value=f*1.49; vvFilt.frequency.value=f*2.4+300;
-    vvGain.gain.value+=((sing*.055*on)-vvGain.gain.value)*.09;
-    rumbleGain.gain.value=.03+v*.02;
-    scheduleClacks();
+let last=performance.now();
+function loop(now){
+  if(!tabHidden){
+    const dt=Math.min((now-last)/1000,.25)*speed; last=now;
+    if(running) advance(dt);
+    voiceTick(); // 就算呢個frame冇轉phase，都要check吓係咪有pending緊嘅報站等running返嚟先播
+    driveAudio(dt,phase);
+    renderFrame();
   }
   requestAnimationFrame(loop);
+}
+
+/* ═══ 背景播放：setInterval頂替rAF（rAF喺收埋分頁嗰陣唔會再由瀏覽器call） ═══
+   BG_TICK_MS淨係「上限」，實際頻率會受瀏覽器背景分頁節流（例如Chrome
+   分頁收埋超過5分鐘之後，會將背景timer進一步節流到大約每分鐘一次）——
+   呢個係瀏覽器本身嘅省電機制，唔係bug；advance()嘅逐邊界推進設計已經
+   保證縱使兩次tick之間隔好耐，都唔會漏站、唔會令idx錯亂。dt本身唔設
+   人為上限（用返真實經過咗嘅時間），先可以喺返嚟前景嗰陣令行程真正
+   反映走咗幾耐；只有guard（loop次數上限）做安全網，防止極端情況
+   （例如系統時鐘跳動）令while loop失控。 */
+const BG_TICK_MS=300;
+function bgTick(){
+  const now=performance.now();
+  const dtReal=Math.max((now-bgLast)/1000,0);
+  bgLast=now;
+  const dt=dtReal*speed;
+  if(running) advance(dt);
+  voiceTick();
+  driveAudio(dt,phase);
+}
+function startBgTimer(){
+  if(bgTimerId) return;
+  bgLast=performance.now();
+  bgTimerId=setInterval(bgTick,BG_TICK_MS);
+}
+function stopBgTimer(){
+  if(bgTimerId){ clearInterval(bgTimerId); bgTimerId=null; }
 }
 
 /* ═══ 操作 ═══ */
@@ -1003,6 +1143,18 @@ function switchLine(id){
   buildDirSeg(); buildSelStart(); setDirLabel(); strip(); paint();
 }
 $('btnSound').onclick=initAudio;
+$('btnBg').onclick=e=>{
+  bgPlayback=!bgPlayback;
+  e.target.setAttribute('aria-pressed',bgPlayback);
+  e.target.textContent=bgPlayback?'開啟':'關閉';
+  // 一般都係喺前景撳呢粒掣，冇即時效果（淨係影響之後收埋分頁嗰刻）；
+  // 呢度加多重保險：萬一啱啱好喺分頁已經收埋緊嗰陣撳到（例如靠device
+  // bridge遙控），即刻套用返新嘅開／關狀態，唔使等落一次visibilitychange。
+  if(tabHidden){
+    if(bgPlayback&&running) startBgTimer();
+    else{ stopBgTimer(); if(ac&&ac.state==='running') ac.suspend(); stopSpeech(); }
+  }
+};
 $('btnRun').onclick=e=>{
   initAudio(); running=!running;
   e.target.textContent=running?'▶ 運行中':'⏸ 停低咗';
