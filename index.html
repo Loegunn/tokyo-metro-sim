@@ -266,7 +266,7 @@ const EN={'中央線':'the Chuo Line','京浜東北線':'the Keihin-Tohoku Line'
 'つくばエクスプレス':'the Tsukuba Express','山手線':'the Yamanote Line',
 '東武スカイツリーライン':'the Tobu Skytree Line',
 '武蔵野線':'the Musashino Line','東葉高速線':'the Toyo Rapid Line',
-'西武有楽町線':'the Seibu Yurakucho Line'};
+'西武有楽町線':'the Seibu Yurakucho Line','京成押上線':'the Keisei Oshiage Line'};
 const YAMANOTE_STATIONS=[
 ['01','東京','とうきょう','Tokyo',[['中央線',C.chuo],['京浜東北線',C.keihin],['東海道線',C.tokaido],['横須賀線',C.yokosuka],['京葉線',C.keiyo],['東海道新幹線',C.shkT],['丸ノ内線',C.maru]],['L','L']],
 ['02','有楽町','ゆうらくちょう','Yūrakuchō',[['京浜東北線',C.keihin],['有楽町線',C.yuraku],['日比谷線',C.hibiya]],['L','L']],
@@ -413,30 +413,58 @@ const TOZAI_STATIONS=[
    官方呢頁講明。開門方向：**用戶未提供資料，全部24個站暫時標null（未確認）**，
    跟返之前加線嘅慣例，唔會亂估。 */
 const YURAKUCHO_STATIONS=[
-['01','和光市','わこうし','Wakoshi',[['東武東上線',C.tobu],['副都心線',C.fuku]],[null,null]],
-['02','地下鉄成増','ちかてつなります','Chikatetsu-narimasu',[],[null,null]],
-['03','地下鉄赤塚','ちかてつあかつか','Chikatetsu-akatsuka',[],[null,null]],
-['04','平和台','へいわだい','Heiwadai',[],[null,null]],
-['05','氷川台','ひかわだい','Hikawadai',[],[null,null]],
-['06','小竹向原','こたけむかいはら','Kotake-mukaihara',[['西武有楽町線',C.seibu],['副都心線',C.fuku]],[null,null]],
-['07','千川','せんかわ','Senkawa',[],[null,null]],
-['08','要町','かなめちょう','Kanamecho',[],[null,null]],
-['09','池袋','いけぶくろ','Ikebukuro',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['丸ノ内線',C.maru],['副都心線',C.fuku],['西武池袋線',C.seibu],['東武東上線',C.tobu]],[null,null]],
-['10','東池袋','ひがしいけぶくろ','Higashi-ikebukuro',[],[null,null]],
-['11','護国寺','ごこくじ','Gokokuji',[],[null,null]],
-['12','江戸川橋','えどがわばし','Edogawabashi',[],[null,null]],
-['13','飯田橋','いいだばし','Iidabashi',[['東西線',C.tozai],['南北線',C.namboku],['都営大江戸線',C.oedo],['中央・総武線',C.sobu]],[null,null]],
-['14','市ケ谷','いちがや','Ichigaya',[['南北線',C.namboku],['都営新宿線',C.shinjukuS],['中央・総武線',C.sobu]],[null,null]],
-['15','麹町','こうじまち','Kojimachi',[],[null,null]],
-['16','永田町','ながたちょう','Nagatacho',[['半蔵門線',C.hanzo],['南北線',C.namboku],['銀座線',C.ginza],['丸ノ内線',C.maru]],[null,null]],
-['17','桜田門','さくらだもん','Sakuradamon',[],[null,null]],
-['18','有楽町','ゆうらくちょう','Yurakucho',[['日比谷線',C.hibiya],['千代田線',C.chiyoda],['都営三田線',C.mita],['山手線',C.yamanote],['京浜東北線',C.keihin]],[null,null]],
-['19','銀座一丁目','ぎんざいっちょうめ','Ginza-itchome',[['銀座線',C.ginza],['丸ノ内線',C.maru],['日比谷線',C.hibiya]],[null,null]],
-['20','新富町','しんとみちょう','Shintomicho',[['日比谷線',C.hibiya]],[null,null]],
-['21','月島','つきしま','Tsukishima',[['都営大江戸線',C.oedo]],[null,null]],
-['22','豊洲','とよす','Toyosu',[['ゆりかもめ',C.yurika]],[null,null]],
-['23','辰巳','たつみ','Tatsumi',[],[null,null]],
-['24','新木場','しんきば','Shin-kiba',[['京葉線',C.keiyo],['りんかい線',C.rinkai]],[null,null]]
+['01','和光市','わこうし','Wakoshi',[['東武東上線',C.tobu],['副都心線',C.fuku]],['L','L']],
+['02','地下鉄成増','ちかてつなります','Chikatetsu-narimasu',[],['R','R']],
+['03','地下鉄赤塚','ちかてつあかつか','Chikatetsu-akatsuka',[],['R','R']],
+['04','平和台','へいわだい','Heiwadai',[],['R','R']],
+['05','氷川台','ひかわだい','Hikawadai',[],['L','L']],
+['06','小竹向原','こたけむかいはら','Kotake-mukaihara',[['西武有楽町線',C.seibu],['副都心線',C.fuku]],['LR','LR']],
+['07','千川','せんかわ','Senkawa',[],['R','R']],
+['08','要町','かなめちょう','Kanamecho',[],['R','R']],
+['09','池袋','いけぶくろ','Ikebukuro',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['丸ノ内線',C.maru],['副都心線',C.fuku],['西武池袋線',C.seibu],['東武東上線',C.tobu]],['R','R']],
+['10','東池袋','ひがしいけぶくろ','Higashi-ikebukuro',[],['R','R']],
+['11','護国寺','ごこくじ','Gokokuji',[],['R','R']],
+['12','江戸川橋','えどがわばし','Edogawabashi',[],['R','R']],
+['13','飯田橋','いいだばし','Iidabashi',[['東西線',C.tozai],['南北線',C.namboku],['都営大江戸線',C.oedo],['中央・総武線',C.sobu]],['R','R']],
+['14','市ケ谷','いちがや','Ichigaya',[['南北線',C.namboku],['都営新宿線',C.shinjukuS],['中央・総武線',C.sobu]],['R','R']],
+['15','麹町','こうじまち','Kojimachi',[],['R','R']],
+['16','永田町','ながたちょう','Nagatacho',[['半蔵門線',C.hanzo],['南北線',C.namboku],['銀座線',C.ginza],['丸ノ内線',C.maru]],['R','R']],
+['17','桜田門','さくらだもん','Sakuradamon',[],['R','R']],
+['18','有楽町','ゆうらくちょう','Yurakucho',[['日比谷線',C.hibiya],['千代田線',C.chiyoda],['都営三田線',C.mita],['山手線',C.yamanote],['京浜東北線',C.keihin]],['R','R']],
+['19','銀座一丁目','ぎんざいっちょうめ','Ginza-itchome',[['銀座線',C.ginza],['丸ノ内線',C.maru],['日比谷線',C.hibiya]],['R','R']],
+['20','新富町','しんとみちょう','Shintomicho',[['日比谷線',C.hibiya]],['L','L']],
+['21','月島','つきしま','Tsukishima',[['都営大江戸線',C.oedo]],['R','R']],
+['22','豊洲','とよす','Toyosu',[['ゆりかもめ',C.yurika]],['R','R']],
+['23','辰巳','たつみ','Tatsumi',[],['R','R']],
+['24','新木場','しんきば','Shin-kiba',[['京葉線',C.keiyo],['りんかい線',C.rinkai]],['R','R']]
+].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
+
+/* ═══ 半蔵門線（Z01～Z14，渋谷⇔押上，直線來回，第六條線）═══
+   官方編號同排序已經對住 tokyometro.jp 官網路線總覽頁（line_hanzomon/index.html）
+   核實過，仲逐個站Fetch咗三越前／錦糸町／水天宮前呢幾個轉乘關係要再確認嘅站
+   個別官方頁面做交叉核對——證實水天宮前官方淨係認日比谷線（經人形町）呢一個
+   轉乘，冇認都營浅草線（總覽頁摘要一開始寫埋都営浅草線，但個別站頁面冇提，
+   跟返保守原則冇加）。三越前、錦糸町嘅JR官方頁面都淨係寫「JR東日本」冇講
+   邊條線，具體JR線名（三越前係經新日本橋站嘅中央・総武線；錦糸町係直接喺
+   同一個站嘅総武線）係跟公開嘅乘換路線資料查返嚟，唔係官方呢頁講明。渋谷、
+   永田町、青山一丁目、九段下、大手町呢幾個同其他線共站嘅transfer，跟返其他
+   線自己個entry交叉比對（換走呢條線自己嗰個名）。開門方向：**用戶未提供
+   資料，全部14個站暫時標null（未確認）**，跟返之前加線嘅慣例，唔會亂估。 */
+const HANZOMON_STATIONS=[
+['01','渋谷','しぶや','Shibuya',[['山手線',C.yamanote],['埼京線',C.saikyo],['湘南新宿ライン',C.shonan],['銀座線',C.ginza],['副都心線',C.fuku],['東急東横線',C.toyoko],['東急田園都市線',C.denen],['京王井の頭線',C.inokashira]],['R','R']],
+['02','表参道','おもてさんどう','Omote-sando',[['銀座線',C.ginza],['千代田線',C.chiyoda]],['R','R']],
+['03','青山一丁目','あおやまいっちょうめ','Aoyama-itchome',[['銀座線',C.ginza],['都営大江戸線',C.oedo]],['R','R']],
+['04','永田町','ながたちょう','Nagatacho',[['有楽町線',C.yuraku],['南北線',C.namboku],['銀座線',C.ginza],['丸ノ内線',C.maru]],['R','R']],
+['05','半蔵門','はんぞうもん','Hanzomon',[],['R','R']],
+['06','九段下','くだんした','Kudanshita',[['東西線',C.tozai],['都営新宿線',C.shinjukuS]],['L','L']],
+['07','神保町','じんぼうちょう','Jimbocho',[['都営三田線',C.mita],['都営新宿線',C.shinjukuS]],['R','R']],
+['08','大手町','おおてまち','Otemachi',[['丸ノ内線',C.maru],['東西線',C.tozai],['千代田線',C.chiyoda],['都営三田線',C.mita]],['R','R']],
+['09','三越前','みつこしまえ','Mitsukoshimae',[['銀座線',C.ginza],['中央・総武線',C.sobu]],['R','R']],
+['10','水天宮前','すいてんぐうまえ','Suitengumae',[['日比谷線',C.hibiya]],['R','R']],
+['11','清澄白河','きよすみしらかわ','Kiyosumi-shirakawa',[['都営大江戸線',C.oedo]],['R','R']],
+['12','住吉','すみよし','Sumiyoshi',[['都営新宿線',C.shinjukuS]],['L','R']],
+['13','錦糸町','きんしちょう','Kinshicho',[['総武線',C.sobu]],['R','R']],
+['14','押上〈スカイツリー前〉','おしあげ','Oshiage',[['都営浅草線',C.asakusa],['京成押上線',C.keisei]],['LR','LR']]
 ].map(a=>({no:a[0],kanji:a[1],kana:a[2],rom:a[3],tf:a[4],door:a[5]}));
 
 /* ═══ 路線總表：每條線嘅色系／徽章／拓撲／方向標籤／footnote ═══ */
@@ -474,7 +502,14 @@ const LINES={
     color:'#C1A470', colorDeep:'#8B6F3E',
     dirLabels:['新木場方面','和光市方面'],
     stations:YURAKUCHO_STATIONS,
-    footnote:'<b>開門方向</b>資料仲未有，全部站暫時標「未確認」，唔會亂估；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅先會列入去（例如永田町↔赤坂見附呢種官方認做同一組轉乘嘅唔同站名安排）；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
+    footnote:'<b>開門方向</b>資料由用戶提供整理；小竹向原因為多股道轉乘結構，兩個方向都標「左／右皆有可能」；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅先會列入去（例如永田町↔赤坂見附呢種官方認做同一組轉乘嘅唔同站名安排）；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
+  },
+  hanzo:{
+    id:'hanzo', name:'半蔵門線', badge:'Z', topology:'linear',
+    color:'#8F76D6', colorDeep:'#5B4A97',
+    dirLabels:['押上方面','渋谷方面'],
+    stations:HANZOMON_STATIONS,
+    footnote:'<b>開門方向</b>資料由用戶提供整理；住吉站兩個方向開門唔同邊（往押上係右側門、往澀谷係左側門），折返之後會自動跟返實際行車方向讀取正確一邊；押上總站因應當日月台安排，兩個方向都標「左／右皆有可能」；轉乘資料保守處理，得返東京メトロ官方頁面都有列嘅先會列入去（水天宮前官方淨係認日比谷線經人形町嗰個轉乘，冇認都營浅草線）；車站改建、臨時調度隨時會令安排改變，僅供沉浸感參考，請以車廂廣播同月台標示為準。'
   }
 };
 let CUR=LINES.yamanote;
@@ -727,15 +762,21 @@ function paint(){
   const stopped=phase==='open'||phase==='dwell'||phase==='close';
   const cur=stopped?at(idx+1):at(idx), nx=stopped?at(idx+2):at(idx+1);
   const focus=stopped?cur:nx;
-  $('nName').textContent=nx.kanji; $('nName').title=nx.kanji;
-  $('nKana').textContent=nx.kana;
-  $('nRom').textContent=nx.rom; $('nRom').title=nx.rom;
-  $('nNo').textContent=nx.no;
+  /* 開門／停站期間，大字唔應該搶先跳去「再下一站」——應該突出顯示緊
+     企喺邊個站（cur），等畫面同你個「ただいまの駅」細box對得上；
+     去到關門／出發（close），大字先切返去下一站，回應返「大字即刻跳
+     去再下一站，冧咗個現正停站嘅重點」呢個外部意見。 */
+  const atStation = phase==='open'||phase==='dwell';
+  const big = atStation ? cur : nx;
+  $('nName').textContent=big.kanji; $('nName').title=big.kanji;
+  $('nKana').textContent=big.kana;
+  $('nRom').textContent=big.rom; $('nRom').title=big.rom;
+  $('nNo').textContent=big.no;
   $('cName').textContent=cur.kanji; $('cName').title=cur.kanji;
   $('cRom').textContent=`${cur.rom} · ${CUR.badge}${cur.no}`;
   const eb=$('eyebrow');
   eb.classList.toggle('hot',phase==='soon'||phase==='close');
-  eb.textContent=phase==='run'?'つぎは':phase==='soon'?'まもなく':phase==='close'?'まもなく発車':'つぎは';
+  eb.textContent=phase==='run'?'つぎは':phase==='soon'?'まもなく':phase==='close'?'まもなく発車':atStation?'ただいま':'つぎは';
   $('tfCap').textContent=`${focus.kanji}駅 のりかえ`;
   const L=$('tfList'); L.innerHTML='';
   if(!focus.tf.length) L.innerHTML='<span class="tf-none">のりかえはありません</span>';
@@ -769,14 +810,20 @@ function enter(p){
     strip();
   }
   const n=at(idx+1);
-  const enTf=n.tf.map(x=>EN[x[0]]).filter(Boolean).slice(0,3);
+  /* 轉乘名單日英要用返同一個封頂，唔可以英文封頂3條、日文卻讀晒全部——
+     舊code兩種語言用緊唔同嘅裁剪邏輯，轉乘特別多嘅站日文會讀好長，同
+     埋亦係造成轉乘名單讀唔切嘅其中一個因素。而家兩種語言由同一個
+     裁剪咗嘅tfCap陣列出發，多過3條會加返「ほか」／"and other lines"
+     提示仲有更多，唔會扮晒齊晒。 */
+  const tfCap=n.tf.slice(0,3), tfMore=n.tf.length>3;
+  const enTf=tfCap.map(x=>EN[x[0]]).filter(Boolean);
   const side = effOuter(idx+1) ? n.door[1] : n.door[0];
   const sideJp = side==='L' ? '左側の' : side==='R' ? '右側の' : '';
   const sideEn = side==='L' ? ' on the left side' : side==='R' ? ' on the right side' : '';
   if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
   if(p==='soon') announce(
-    `まもなく、${n.kanji}、${n.kanji}です。`+(n.tf.length?`${n.tf.map(x=>x[0]).join('、')}は、お乗り換えです。`:''),
-    `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}.`:''));
+    `まもなく、${n.kanji}、${n.kanji}です。`+(tfCap.length?`${tfCap.map(x=>x[0]).join('、')}${tfMore?'ほか':''}は、お乗り換えです。`:''),
+    `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}${tfMore?', and other lines':''}.`:''));
   if(p==='open'){ airRelease(.13); doorAir();
     announce(`${n.kanji}、${n.kanji}です。${sideJp}ドアが開きます。ご注意ください。`,
               `This is ${n.rom}. The doors${sideEn} will open.`,700); }
