@@ -1,0 +1,104 @@
+# 東京地下鐵車內顯示屏 · 交接文件（2026-09-10，v1.0.1）
+
+呢個係 Loegunn 嘅興趣project：單一 HTML 檔案嘅車廂資訊顯示屏模擬器（次頁「つぎは」LCD風格＋語音報站＋橫向路線strip），原本淨係山手線，而家改成可以喺同一個網頁切換多條線。長遠目標係整成一個app俾「鐵膠」（鐵道迷）玩，仲未有明確時間表，用戶自評依家「10分滿分得6分，好多細節未執」。
+
+## 版本號規則（2026-09-10新增嘅固定要求，之後每次都要跟）
+- 格式：v1.0、v1.0.1、v1.1、v2.0，v後面唔加點。修bug/文字/小幅調整＝patch；加新功能/明顯體驗改善＝minor；大幅改版/主要架構更新＝major。
+- 同一次工作嘅中間存檔唔使跟住升版，以「正式交付」做單位。
+- 之前歷次交付冇正式版本號紀錄，2026-09-10追溯訂做v1.0基準；呢一輪交付係v1.0.1。
+- 程式入面const APP_VERSION='v1.0.1';（喺script最頂、注釋之後）係單一資料來源，$('appVer').textContent=APP_VERSION;喺init嗰段set；HTML入面對應嘅element係<div class="ver" id="appVer">，擺喺footnote下面，位置刻意唔影響操作。每次正式交付都要記得同步升呢個常數，唔好淨係改功能唔改版本號。
+- 每次交付：開發日誌新記錄要包含版本、日期、新增功能、修正問題、測試結果、已知問題及未驗證項目；交付訊息要寫明「由邊個版本更新至邊個版本」；index.html呢個檔名要keep住（唔好改名），方便GitHub Pages流程；舊更新紀錄唔好覆蓋，新記錄加喺頂；追溯唔到確實版本嘅歷史紀錄唔好杜撰版本號，寫「版本號未記錄」。
+
+## 版本歷程
+1. 無bgm嘅yamanotev5.html（用戶原本上載）— 純山手線，環狀，冇地圖。（版本號未記錄）
+2. v6 試過加「真實形狀路線圖」。用戶反應：「有啲醜」，已經放棄呢個方向，唔好再撿返嚟做。（版本號未記錄）
+3. v1.0基準：現行版本 東京地下鐵車內顯示屏.html，多路線可切換架構，六條線，經歷咗三份第三方（ChatGPT）code review，共修正咗9個真bug（詳見下面三輪修正記錄）＋兩輪UI細位。
+4. v1.0.1（呢一輪，2026-09-10）：暫停/跳站恢復漏播、倍速取消保護、行駛途中切方向teleport 三個問題修正＋建立版本號系統本身。
+
+## 部署方式：用戶自己用GitHub Pages host＋GitHub Desktop
+- 用戶明確表示唔想用Claude託管嘅Artifact網站（「我唔想用你託管網站」），改用自己個GitHub帳號開GitHub Pages（免費static hosting，Public repo）。
+- 重要（俾之後接手嘅Claude睇）：以後交付呢個project嘅更新，預設做法係俾用戶一個完整嘅index.html檔案（用SendUserFile），唔好推去Claude Artifact嗰條link做主要分發方式。
+- 用戶裝咗GitHub Desktop，clone咗個repo（叫tokyo-metro-sim）落自己部電腦，更新流程：Finder覆蓋本地index.html → GitHub Desktop「Commit to main」→「Push origin」。
+- 呢個環境未連到用戶嘅GitHub帳號，冇辦法直接幫佢push——用戶問過「能放上git嗎」，已經回覆解釋清楚，繼續要靠佢自己嗰邊GitHub Desktop三步。如果之後Claude有官方GitHub連接工具，記得話用戶知可以唔使再手動。
+- 用戶已經用自己部iPhone經GitHub Pages網址測試過版本號未記錄嘅早期狀態，回報「完全沒問題」——但呢個唔代表之後嘅任何一輪改動都已經真機驗證咗，詳見「測試紀錄範圍」一節。由第二份ChatGPT review開始一直到而家嘅v1.0.1，全部都仲未有真機report，淨係Playwright驗證過邏輯。
+- 提醒：project docs曾經試過用SendUserFile傳.md檔俾用戶，用戶反映「無法下載」；.html檔就冇呢個問題；.txt副檔名嘅內容就傳得到。之後傳changelog／handoff文字文件俾用戶，一律用.txt，或者叫佢直接去claude.ai個project度睇（兩份文件都存咗喺project度，係.md）。
+
+## 現行架構（做嘢之前建議睇實際檔案，呢度淨係摘要）
+- LINES 呢個object入面每條線一個entry：id/name/badge/topology('loop'|'linear')/color/colorDeep/dirLabels/stations/footnote。加多條線基本上只係加data，唔使改架構。
+- order()／at() 兩個function做咗拓撲通用化：loop（山手線）wrap一個環；linear（銀座線、日比谷線、東西線、有楽町線、半蔵門線）用「虛擬長度 2×(N-1)」嘅來回序列模擬去到總站自動调头。注意：linear假設條線淨係得兩個總站、冇支線；有支線嘅線（丸ノ内線方南町支線、千代田線北綾瀬支線）要另外諗過資料結構先做得。
+- effOuter(i)：forwardLeg = m>=1 && m<=N-1; return forwardLeg===outer;——m===0（返到起點總站，包括完成成個往返返嚟嗰刻）刻意唔算forwardLeg，因為呢個位物理上係「返程」嘅到達。doorSideText()、enter()嘅報站side、setDirLabel()、dirSeg手動撳掣統一用effOuter()。loop拓撲（山手線）直接原封不動返返outer。
+- 切換路線用 switchLine(id)，reset晒 idx/t/phase/outer/dirMode/pendingDir，換色、換徽章、換footnote、rebuild方向掣同起點dropdown。selLine下拉由Object.values(LINES)自動生成，加新線唔使手動改。
+- 開門方向資料格式：door:[A,B]——loop個case係[内回り側,外回り側]；linear個case係[較細編號方向嗰邊側,較大編號方向嗰邊側]。唔肯定嘅站一律null；'R?'（銀座線浅草站）、'LR'（真係兩邊都有可能）兩種軟性標記。doorSideText(st,i)處理呢四種case。
+- genId代數標記：切換路線／跳站／暫停／靜音／收埋分頁都會令佢增加（摺咗入stopSpeech()本身）。v1.0.1新增：speak()嘅speed>1分支（倍速即刻cancel再開新嗰段）之前冇bump genId，令舊utterance嘅onend/onerror有機會遲到但仍然通過nextUtt()嘅代次檢查、誤推進新排嘅queue——而家呢個分支開頭加咗genId++。
+- annReq／voicedAnn（v1.0.1新增，取代舊嘅「running&&!tabHidden就喺enter()入面直接announce」做法）：將「畫面狀態已更新」（enter()推進idx/phase並paint()）同「必要報站真正播咗未」拆開兩個獨立概念追蹤。enter()一有新phase轉換就annReq++，唔再直接觸發announce。真正負責出聲嘅係新function voiceTick()（每個loop frame都call，喺enter(p)之後），佢check annReq!==voicedAnn先會嘗試播，如果running&&!tabHidden唔成立就keep住個request pending唔清（唔會assume佢自動播過），等到真係running又冇hide先播——用現正（call嗰刻）嘅idx/phase重新計算報站內容，唔係捕捉緊transition嗰刻嘅舊值。修正咗「暫停期間phase被靜靜哋更新咗，恢復之後因為p===phase已經相等，就永遠漏播嗰句」嘅bug（呢個係『修正咗暫停會亂報站』之後遺留低嘅殘餘問題——即係話gate啱咗「暫停唔出聲」冇錯，但冇處理「resume之後點補返」）。
+- pendingDir（v1.0.1新增）：行駛途中或者停站中撳方向掣，唔再即刻outer=want;jumpTo(cur.no)（會令t/phase即刻reset去開門階段，造成teleport）。而家撳掣淨係set pendingDir（'out'/'in'），真正嘅outer／idx轉換延後到下一次prev==='close'&&p==='run'（即係下一次真正出發）先喺enter()度執行：loop拓撲用返idx=-idx（同every-lap turnaround果條轉換公式一樣，通用任何realCur）；linear拓撲用S.findIndex揾返現正物理站嘅realIdx，idx = want ? realIdx : (N-1-realIdx)嚟keep住同一個physical station、但用新方向嘅index系統表示。setDirLabel()而家會喺方向標籤度加返「　→　下一程轉：XX方面」提示，dirSeg嘅按鈕加咗.pending CSS class標示緊「待套用、未生效」；撳返一粒同現正實際方向一致嘅掣（pendingDir喺click handler開頭已經先清空）就等於取消個pending轉向。switchLine()／jumpTo()都會清埋pendingDir（轉咗線或者手動跳站，舊嘅pending方向請求應該作廢）。
+- paint()嘅big／atStation：stopped（open/dwell/close）狀態下，cur=at(idx+1)啱啱到嘅站，nx=at(idx+2)真正下一站。atStation=phase==='open'||phase==='dwell'時，大字（#nName）顯示cur（eyebrow「ただいま」）；去到close先切返顯示nx（eyebrow「まもなく発車」）。
+- enter(p)嘅tfCap／tfMore（喺voiceTick()入面）：日英轉乘名單統一由tfCap=n.tf.slice(0,3)出發，多過3條（tfMore）就日文加「ほか」、英文加「, and other lines」。
+
+## 三份第三方（ChatGPT）code review：合共9個真bug＋兩輪UI細位，全部已修正並用Playwright驗證
+
+### 第一輪（用戶用screenshot實測搵出嚟；已喺真iPhone確認work，版本號未記錄）
+Bug 1：enter(p)入面idx++同計算報站用嘅n=at(idx+1)次序調轉咗。修正：idx++搬去計n之前。
+Bug 2：speak()每次都即刻cancel，正常速度下轉乘名單長過8秒會俾打斷。修正：speak()喺速度×1時排隊、×3/×8保留即刻cancel；新加stopSpeech()。
+
+### 第一份ChatGPT review（已用Playwright驗證，未有真機report；歸入v1.0基準）
+Bug 3：直線來回路線行到終點掉頭後，方向標籤同開門邊冇跟住變。修正：加咗effOuter(i)（後尾第二份review再修正一次）。
+Bug 4：暫停／靜音／收埋分頁之後，delayed報站可能照樣播出嚟。修正：genId++摺咗入stopSpeech()本身。
+UI細位1：轉乘日英長短唔一。修正：tfCap/tfMore統一封頂3條。
+UI細位2：停站期間大字搶先跳去再下一站。修正：big/atStation改顯示緊企嗰個站。
+
+### 第二份ChatGPT review（分P0/P1兩級；已用Playwright驗證，未有真機report；歸入v1.0基準）
+P0-1　直線來回路線完成成個往返、返到起點總站嗰一刻，方向判成去程：effOuter(i)舊公式m<=N-1冇排除m===0。修正：forwardLeg = m>=1 && m<=N-1。連帶修正：dirSeg手動撳掣改用effOuter(idx+1)比較（而唔係原始outer），setDirLabel()順便同步dirSeg按鈕嘅aria-pressed。
+P0-2　暫停後切線或跳站，仍然觸發新報站：enter(p)入面announce()等收埋入if(running&&!tabHidden){...}。注意：呢個修正本身冇錯，但留低咗一個殘餘問題——冇處理「恢復之後點補返個報站」，喺第三份review先發現並修正（見下）。
+P0-3　山手線「每圈調頭」索引錯位：舊公式idx=-idx-1差一個站。修正：idx=-idx。
+資料：有楽町線千川（Y07）／要町（Y08）已補副都心線轉乘。
+
+### 第三份ChatGPT review（2026-09-10，提出版本號固定要求；已用Playwright驗證，未有真機report；本輪v1.0.1）
+恢復漏播：P0-2修正咗「暫停唔出聲」，但恢復運行之後如果冇再有新嘅phase轉換，個報站會因為p===phase已經相等而永遠播唔到。修正：拆做annReq（畫面轉換代次）／voicedAnn（已播代次）兩個counter，新function voiceTick()每個frame都check，pending住嘅report會等到真係running先播，用現正嘅idx/phase重新計算內容。
+倍速舊回呼：speak()嘅speed>1分支冇bump genId，令舊onend/onerror有機會遲到都仲通過nextUtt()嘅代次檢查。修正：呢個分支開頭加genId++。
+行駛途中切方向teleport：撳方向掣即刻jumpTo()，令t/phase即刻reset去開門階段，半路teleport去前方站。修正：新增pendingDir機制，撳掣淨係記低意向，等下一次真正出發（prev==='close'&&p==='run'）先套用；停站中撳掣都係同一原則，唔會打亂現正呢個站嘅到站資料；UI會顯示「現正方向　→　下一程轉：XX方面」。
+版本號系統：新增APP_VERSION常數＋UI顯示（見上面「版本號規則」）。
+開發日誌更正：「六條線全部有齊開門方向」呢句更正（山手線16站／銀座線1站其實null，詳見下面「各線資料摘要」）；測試紀錄補返版本/範圍註明。
+
+## 開門方向色彩區分／乘客全螢幕模式
+- paintDoorHighlight(side)：side==='L'或'LR'highlight左門；'R'／'R?'／'LR'highlight右門；淨係「肯定」case（L／R）先加flash。prefers-reduced-motion有fallback。
+- #btnPassenger：toggle .unit嘅passenger class，隱藏.ctl／.audio／.ver，嘗試requestFullscreen()，撳多次或Esc都自動同步。
+
+## 各線資料摘要（更正版，唔好再講「全部已填」）
+- 山手線（JY01東京～JY30神田，環狀，30站）：内回り30站全部有據；外回り淨係田端～田町段8個站＋澀谷站有確證，其餘16站（高輪ゲートウェイ、品川、大崎、五反田、目黒、恵比寿、原宿、代々木、新宿、新大久保、高田馬場、目白、池袋、大塚、巣鴨、駒込）仍然係null（未確認，如實標示，冇亂估）。
+- 銀座線（G01渋谷～G19浅草，19站）：開門方向18站已填，浅草（終點總站）1個方向係null，屬於「呢個方向本身唔存在」（已經到咗總站，冇「往浅草方向」呢回事），唔算缺資料。
+- 日比谷線（H01中目黒～H22北千住，22站）：開門方向全部22站已填。
+- 東西線（T01中野～T23西船橋，23站）：開門方向全部23站已填。
+- 有楽町線（Y01和光市～Y24新木場，24站）：開門方向全部24站已填，小竹向原（Y06）標LR。千川（Y07）／要町（Y08）已補副都心線轉乘。
+- 半蔵門線（Z01渋谷～Z14押上，14站）：開門方向全部14站已填，押上（Z14，總站，依月台）標LR；住吉（Z12）係全app目前唯一一個「兩個方向開唔同邊門」嘅站：door:['L','R']，已用Playwright測試過去程回程都讀啱。
+
+## 測試紀錄範圍（邊次測試covered邊個版本，唔好將舊版通過當成新版已驗證）
+- 最早期（版本號未記錄）：用戶用真iPhone經GitHub Pages網址實測過，回報「完全沒問題」——覆蓋範圍係當時嘅狀態（第一輪screenshot bug修正之後），唔包括之後任何一輪改動。
+- v1.0基準（第一份、第二份ChatGPT review嗰兩輪）：淨係Playwright模擬邏輯驗證，未有真機report。
+- v1.0.1（呢一輪）：淨係Playwright模擬邏輯驗證（annReq/voicedAnn恢復播報、genId倍速保護、pendingDir延遲套用、五線正反完整往返、山手線雙向調頭全部覆蓋），0個JS error；未做真實瀏覽器播放測試、未做iPhone/Android真機試玩。
+
+## 測試方法學嘅教訓
+- 驗證「每個站都有報站」要用page.add_init_script將window.requestAnimationFrame覆寫做冇效，唔可以同手動call嘅window.loop()並存；而家announce觸發喺voiceTick()唔喺enter()，測試coverage時要記得enter(p)之後都call多次voiceTick()，唔係得返0個call。
+- 驗證報站文字／排隊行為要保留返真實rAF，直接monkey-patch speechSynthesis.speak/cancel。
+- 驗證「暫停之後嘅操作」要留意：唔可以再淨係assume「暫停就乜都唔出聲」就收工——仲要專門試「暫停→操作→（唔再有其他狀態變化嘅情況下）恢復」，check個報站有冇補播返，先摷到annReq/voicedAnn呢類「消費咗個phase轉換但冇真正播過」嘅遺留bug。
+- 驗證「行駛途中操作」（例如切方向）要專登揀一個mid-transit嘅idx（phase==='run'或'soon'，唔好淨係喺close/dwell嗰啲已經停低嘅狀態測），先摷到「即刻teleport」呢類bug；仲要驅動多一個完整leg（soon→open→dwell→close→run）先驗證到pending狀態真係喺下一次出發先套用。
+- 驗證「掉頭後方向不對稱嘅門邊」（例如神楽坂、住吉）呢類case，最直接做法係直接call at(i+1)／effOuter(i+1)／doorSideText()喺全個2*(N-1)虛擬週期入面搵出目標站出現嘅兩個位置。
+- 外部（第三方AI）code review嘅處理原則：唔照單全收，逐項用Playwright實測驗證先落手改；證實嘅先改，未證實／純屬設計意見嘅記低但唔急住做；跟返「小步驟」原則交付。
+- 官方頁面「摘要 vs 個別站頁面」可能有出入：兩個方向嘅誤差都試過（有時摘要多加咗個別頁冇確認嘅轉乘，有時摘要漏咗個別頁確實有嘅轉乘），一定要逐個可疑站Fetch返個別官方頁面先落單。
+- 開發日誌嘅措辭要留意「全部／已齊」呢類字眼：只要有一個站係null，都唔應該講「全部有齊」，就算個null本身係設計上就冇意義（例如淺草站）都要講清楚係邊種null，唔好一律含糊帶過。
+
+## 外部review意見嘅評估
+- 第一份（表格形式，v1.0基準）：真係值得做嘅淨係「開門方向色彩區分」同「乘客全螢幕模式」，已完成。
+- 第二份（ChatGPT code review，分P0/P1，v1.0基準）：三個P0全部修正；一個資料遺漏（千川／要町副都心線）已修正。
+- 第三份／最新（ChatGPT code review，2026-09-10，v1.0.1）：兩個bug（恢復漏播、倍速舊回呼）＋一個操作設計問題（途中切方向teleport）全部核實並修正；建立版本號系統；更正開發日誌過度肯定嘅描述。
+
+## IP／侵權考量（用戶問過，未有結論，暫時擱置）
+Public repo代表個code而家任何人都search到、睇到，同之前「純私人」已經唔同——用戶未有再問，暫時淨係記低。
+
+## 下一步可能方向（未拍板，睇用戶點揀；跟返最新review嘅版本計劃）
+- v1.1：開始乘車（統一手勢啟動音響＋行程）、全部靜音按鈕、音響狀態文字分開確認車廂聲／日文語音／英文語音、語音佇列嘅完整「站/階段過時判斷」重新設計。
+- 後續驗證：日比谷線六本木→神谷町→虎ノ門Hills→霞關聲畫測試，再做手機同背景返回測試。
+- 加多幾條線：冇支線嘅線（南北線、副都心線）可以直接加，零架構改動；有支線嘅線（丸ノ内線、千代田線、都營大江戸線）要先諗過拓撲資料結構。
+- 執靚視覺／操作細節：小螢幕控制列排版、無障礙/語言一致性，中低優先，未開始。
+- 諗個「app」大致形態（依家係一頁切換線，定係想要個首頁揀線）。
+- 山手線外回り16站、銀座線淺草1個方向嘅開門資料仍然係null，如果用戶有意欲可以之後再問佢有冇資料補；冇資料就繼續keep null，唔好亂估。

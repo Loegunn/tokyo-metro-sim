@@ -127,6 +127,8 @@ select{font-weight:500;padding:6px 8px}
 button:hover,select:hover{border-color:var(--uguisu-deep)}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--uguisu);outline-offset:2px}
 button[aria-pressed="true"],button.on{background:var(--uguisu-deep);border-color:var(--uguisu-deep);color:#fff}
+.seg button.pending{box-shadow:inset 0 0 0 2px var(--uguisu-deep);color:var(--uguisu-deep);font-style:italic}
+.seg button[aria-pressed="true"].pending{box-shadow:none} /* 理論上唔會同時發生，保險擋住 */
 .seg{display:flex}
 .seg button{border-radius:0;margin-left:-1px;padding:6px 11px}
 .seg button:first-child{border-radius:3px 0 0 3px;margin-left:0}
@@ -134,6 +136,9 @@ button[aria-pressed="true"],button.on{background:var(--uguisu-deep);border-color
 input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 .note{padding:8px 18px 15px;font-size:10.5px;color:#8A9096;line-height:1.6;background:#F7F8F5}
 .note b{color:var(--uguisu-deep)}
+.ver{padding:0 18px 8px;font-size:9.5px;color:#B7BCB2;background:#F7F8F5;text-align:right;
+  letter-spacing:.04em;user-select:text}
+.unit.passenger .ver{display:none}
 
 @media (max-width:760px){
   body{padding:0}.unit{border-radius:0}
@@ -231,9 +236,20 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
   <div class="note" id="footnote">
     <b>開門方向</b>資料源自非官方鐵道部落格整理（内回り 30 站有多個來源互相印證；外回り 僅田端～田町段及澀谷站有確證），車站改建會令方向改變，僅供沉浸感參考，未確認嘅站會如實標示「未確認」而唔會亂估。
   </div>
+  <div class="ver" id="appVer"></div>
 </div>
 
 <script>
+/* ═══ 版本號 ═══
+   之後每次「正式交付」都要跟住呢個規則升版：修bug/文字/小幅調整＝
+   patch（v1.0→v1.0.1）；加新功能/明顯體驗改善＝minor（v1.0.1→v1.1）；
+   大幅改版/主要架構更新＝major（v1.1→v2.0）。同一次工作入面嘅中間
+   存檔唔使跟住升，以正式交付做單位。呢個常數係全個程式讀版本號嘅
+   唯一source，介面顯示（#appVer）同交接文件都要對得住呢度。
+   v1.0＝2026-09-10之前歷次交付嘅基準（冇正式版本號紀錄，追溯訂為
+   v1.0）；v1.0.1＝呢一輪：暫停/跳站恢復漏播、倍速取消漏保護、行駛
+   途中切方向teleport 三個bug修正＋呢個版本號系統本身。 */
+const APP_VERSION='v1.0.1';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -528,6 +544,17 @@ const CYCLE=B.dwell+T.close, GAP=120;
 let idx=0,t=0,outer=true,dirMode='out',running=true;
 let speed=1,rate=.95,vol=.4,voiceOn=true,phase='',lapMark=0,genId=0;
 let v=0,vPrev=0,accel=0,tabHidden=false;
+/* pendingDir：行駛途中或停站中撳方向掣，唔會即刻jumpTo teleport——淨係
+   記低「下一程想轉去邊」，等而家呢程真正行完（下一次close→run出發）
+   先套用，等抵達方向／開門資料喺呢一程完整、唔會半路跳站。 */
+let pendingDir=null;
+/* annReq／voicedAnn：將「畫面狀態已更新」（phase／idx）同「必要報站已經
+   真正播咗」拆開嚟追蹤。enter()一有新phase就annReq++；voiceTick()先係
+   真正負責出聲嗰個，每個frame都會check，如果annReq同voicedAnn唔同就話
+   有嘢未播——如果嗰陣running／tabHidden唔啱就keep住唔播，等到真係
+   running又冇hide先播現正嗰個phase，唔會恢復咗都漏播、亦唔會因為暫停
+   期間phase靜靜哋變咗就當自動播過。 */
+let annReq=0,voicedAnn=-1;
 const $=id=>document.getElementById(id);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* 環狀路線（山手線）：一圈行晒 N 個站，wrap 返轉頭。
@@ -703,7 +730,14 @@ function stopSpeech(){
 }
 function speak(list){
   if(!voiceOn||!window.speechSynthesis) return;
-  if(speed>1){ speechSynthesis.cancel(); liveUtterances=[]; queue=list.slice(); speaking=false; nextUtt(); return; }
+  if(speed>1){
+    /* 呢度cancel緊嘅嗰句舊utterance，個onend/onerror遲啲先到嘅話，
+       如果冇bump genId，佢個myGen仲係啱嘅、會通過nextUtt()嘅代次
+       檢查，誤將啱啱先排落去嘅新queue推咗一格（英文嗰句提早送出）。
+       所以呢度都要同stopSpeech()一樣bump genId，令舊回呼即刻作廢。 */
+    genId++;
+    speechSynthesis.cancel(); liveUtterances=[]; queue=list.slice(); speaking=false; nextUtt(); return;
+  }
   queue=queue.concat(list);
   if(!speaking) nextUtt();
 }
@@ -831,40 +865,55 @@ function enter(p){
        physical站（例如東京調頭之後，現正所在站仍然係東京，下一站先係
        神田／有樂町，睇邊個方向）。 */
     if(dirMode==='alt'&&++lapMark>=S.length){lapMark=0;outer=!outer;idx=-idx;setDirLabel();}
+    else if(pendingDir!==null){
+      /* 行駛途中／停站中撳咗方向掣，記低嘅pendingDir而家先真正生效——
+         啱啱好喺呢一刻（現正呢程行完、開始下一程）套用，keep住抵達
+         方向嘅站同開門資料完整，唔會半路teleport。 */
+      const want=pendingDir==='out';
+      if(CUR.topology==='loop'){
+        if(want!==outer){ outer=want; idx=-idx; }
+      }else if(want!==effOuter(idx)){
+        const cur=at(idx), N=S.length, realIdx=S.findIndex(x=>x.no===cur.no);
+        outer=want; idx = want ? realIdx : (N-1-realIdx);
+      }
+      setDirLabel();
+      pendingDir=null;
+    }
     strip();
   }
-  const n=at(idx+1);
-  /* 轉乘名單日英要用返同一個封頂，唔可以英文封頂3條、日文卻讀晒全部——
-     舊code兩種語言用緊唔同嘅裁剪邏輯，轉乘特別多嘅站日文會讀好長，同
-     埋亦係造成轉乘名單讀唔切嘅其中一個因素。而家兩種語言由同一個
-     裁剪咗嘅tfCap陣列出發，多過3條會加返「ほか」／"and other lines"
-     提示仲有更多，唔會扮晒齊晒。 */
+  annReq++; // 呢個phase轉換需要一句新報站——真正出唔出聲、播邊句交返voiceTick()判斷
+  paint();
+}
+function voiceTick(){
+  /* 將「畫面已更新」（enter()做嘅嘢）同「報站已經真正播咗」拆開：
+     annReq每有新phase轉換就會加，voicedAnn追蹤上一次真正播咗嗰個代。
+     暫停（running=false）／收埋分頁（tabHidden）期間annReq會繼續加
+     （因為switchLine／jumpTo仍然會即刻reset phase畀你睇畫面預覽），
+     但呢度會keep住唔播，等到真係running又冇hide先至，用返「現正」
+     嘅idx／phase播返適用嗰句——資源到位先播，唔會恢復咗漏晒，亦
+     唔會因為暫停期間phase靜靜哋變咗就當自動播過。 */
+  if(annReq===voicedAnn) return;
+  if(!(running&&!tabHidden)) return;
+  voicedAnn=annReq;
+  const p=phase, n=at(idx+1);
   const tfCap=n.tf.slice(0,3), tfMore=n.tf.length>3;
   const enTf=tfCap.map(x=>EN[x[0]]).filter(Boolean);
-  const side = effOuter(idx+1) ? n.door[1] : n.door[0];
-  const sideJp = side==='L' ? '左側の' : side==='R' ? '右側の' : '';
-  const sideEn = side==='L' ? ' on the left side' : side==='R' ? ' on the right side' : '';
-  /* 暫停（running=false）／收埋分頁（tabHidden）期間，切線或跳站會
-     令phase／idx即刻reset，令上面嘅p!==phase成立、繼續行到呢度——但
-     呢種情況只應該更新畫面（等預覽跟得住你揀嘅路線／站），唔應該
-     自動播新語音同音效。所以真正「觸發報站／開關門聲效」呢一段收埋
-     入呢個check，keep返idx／phase／paint()喺任何情況都會更新。 */
-  if(running&&!tabHidden){
-    if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
-    if(p==='soon') announce(
-      `まもなく、${n.kanji}、${n.kanji}です。`+(tfCap.length?`${tfCap.map(x=>x[0]).join('、')}${tfMore?'ほか':''}は、お乗り換えです。`:''),
-      `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}${tfMore?', and other lines':''}.`:''));
-    if(p==='open'){ airRelease(.13); doorAir();
-      announce(`${n.kanji}、${n.kanji}です。${sideJp}ドアが開きます。ご注意ください。`,
-                `This is ${n.rom}. The doors${sideEn} will open.`,700); }
-    if(p==='close'){ chimeDoor();
-      const g=genId;
-      setTimeout(()=>{ if(g===genId) speak([['ja-JP','ドアが閉まります。ご注意ください。'],
-                            ['en-US','The doors are closing. Please watch your step.']]); },400);
-      setTimeout(()=>{ if(g===genId) doorAir(); },1500); // 呢個sfx以前冇代次保護，切線／暫停之後都會殘留播出嚟
-    }
+  const side=effOuter(idx+1)?n.door[1]:n.door[0];
+  const sideJp=side==='L'?'左側の':side==='R'?'右側の':'';
+  const sideEn=side==='L'?' on the left side':side==='R'?' on the right side':'';
+  if(p==='run') announce(`次は、${n.kanji}、${n.kanji}です。`,`The next station is ${n.rom}.`);
+  if(p==='soon') announce(
+    `まもなく、${n.kanji}、${n.kanji}です。`+(tfCap.length?`${tfCap.map(x=>x[0]).join('、')}${tfMore?'ほか':''}は、お乗り換えです。`:''),
+    `We will soon make a brief stop at ${n.rom}.`+(enTf.length?` Please change here for ${enTf.join(', ')}${tfMore?', and other lines':''}.`:''));
+  if(p==='open'){ airRelease(.13); doorAir();
+    announce(`${n.kanji}、${n.kanji}です。${sideJp}ドアが開きます。ご注意ください。`,
+              `This is ${n.rom}. The doors${sideEn} will open.`,700); }
+  if(p==='close'){ chimeDoor();
+    const g=genId;
+    setTimeout(()=>{ if(g===genId) speak([['ja-JP','ドアが閉まります。ご注意ください。'],
+                          ['en-US','The doors are closing. Please watch your step.']]); },400);
+    setTimeout(()=>{ if(g===genId) doorAir(); },1500);
   }
-  paint();
 }
 
 let last=performance.now();
@@ -873,6 +922,7 @@ function loop(now){
   if(running&&!tabHidden){ t+=dt; if(t>=CYCLE) t-=CYCLE; }
   const p=t<B.run?'run':t<B.soon?'soon':t<B.open?'open':t<B.dwell?'dwell':'close';
   enter(p);
+  voiceTick(); // 就算呢個frame enter()冇轉phase，都要check吓係咪有pending緊嘅報站等running返嚟先播
 
   vPrev=v;
   if(p==='run'){ const e=t/T.run; v=e<.34?Math.pow(e/.34,.7):1-(e-.34)*.12; }
@@ -911,15 +961,21 @@ function loop(now){
 /* ═══ 操作 ═══ */
 function setDirLabel(){
   const eff=effOuter(idx+1);
-  $('dirLabel').textContent=CUR.dirLabels[eff?0:1];
+  let label=CUR.dirLabels[eff?0:1];
+  if(pendingDir!==null) label+=`　→　下一程轉：${CUR.dirLabels[pendingDir==='out'?0:1]}`;
+  $('dirLabel').textContent=label;
   /* 自動折返之後effOuter會變、但dirMode／揀開嗰粒掣本身唔會自動跟住郁——
      每次update方向標籤都順便同步返方向掣嘅aria-pressed，等佢反映返
-     「而家實際行緊邊個方向」，唔會出現折返完，個掣仲揀住去程嗰粒嘅怪現象。 */
+     「而家實際行緊邊個方向」，唔會出現折返完，個掣仲揀住去程嗰粒嘅怪現象。
+     pendingDir未生效嗰粒掣用返.pending樣式標示「待套用」，唔會當佢
+     已經生效（aria-pressed唔會提早設做true）。 */
   if(dirMode!=='alt'){
     const seg=$('dirSeg');
     if(seg) [...seg.children].forEach(x=>{
-      if(x.dataset.dir==='out'||x.dataset.dir==='in')
+      if(x.dataset.dir==='out'||x.dataset.dir==='in'){
         x.setAttribute('aria-pressed', String((x.dataset.dir==='out')===eff));
+        x.classList.toggle('pending', pendingDir===x.dataset.dir);
+      }
     });
   }
 }
@@ -942,7 +998,7 @@ function switchLine(id){
   $('jyBadge').textContent=L.badge; $('lineName').textContent=L.name;
   $('plateL').textContent=L.badge; $('trainStripe').setAttribute('fill',L.color);
   $('footnote').innerHTML=L.footnote;
-  outer=true; dirMode='out'; lapMark=0; idx=0; t=0; phase=''; genId++;
+  outer=true; dirMode='out'; lapMark=0; idx=0; t=0; phase=''; genId++; pendingDir=null;
   stopSpeech();
   buildDirSeg(); buildSelStart(); setDirLabel(); strip(); paint();
 }
@@ -955,14 +1011,19 @@ $('btnRun').onclick=e=>{
 };
 $('dirSeg').onclick=e=>{
   const b=e.target.closest('button'); if(!b) return;
-  dirMode=b.dataset.dir; lapMark=0;
+  dirMode=b.dataset.dir; lapMark=0; pendingDir=null;
   [...e.currentTarget.children].forEach(x=>x.setAttribute('aria-pressed',x===b));
   /* 比較要用effOuter（而家實際行緊嗰個方向），唔可以淨係比較初始嘅
      outer——直線來回路線折返咗之後，outer本身唔會變，如果淨係同outer
-     比較，撳落一粒其實同「現正方向」一致嘅掣，都會誤判做「要切方向」，
-     搞出一次冇必要嘅jumpTo（打斷緊緊嘅報站、無端端跳咗一下畫面）。 */
+     比較，撳落一粒其實同「現正方向」一致嘅掣，都會誤判做「要切方向」。
+     以前呢度一有唔同就即刻jumpTo()——但jumpTo會將t/phase重設去開門
+     階段，行緊駛／停緊站中途撳掣就會即刻teleport去前方站，好突兀。
+     而家改做：淨係記低pendingDir，等而家呢程真正行完（下一次
+     close→run出發，喺enter()嗰度處理）先套用，keep返抵達方向嘅站同
+     開門資料完整，唔會半路跳站。撳返一粒同現正方向一致嘅掣（前面
+     已經pendingDir=null）就等於取消個pending轉向。 */
   if(dirMode!=='alt'){ const want=dirMode==='out';
-    if(want!==effOuter(idx+1)){ const cur=at(idx+1); outer=want; jumpTo(cur.no); } }
+    if(want!==effOuter(idx+1)) pendingDir=dirMode; }
   setDirLabel(); paint();
 };
 $('spdSeg').onclick=e=>{
@@ -980,7 +1041,7 @@ $('vol').oninput=e=>vol=Number(e.target.value);
 
 function jumpTo(no){
   const list=order(),k=list.findIndex(s=>s.no===no);
-  idx=k-1; t=B.soon+.01; phase=''; lapMark=0; genId++;
+  idx=k-1; t=B.soon+.01; phase=''; lapMark=0; genId++; pendingDir=null;
   stopSpeech();
   strip(); paint();
 }
@@ -1014,6 +1075,7 @@ Object.values(LINES).forEach(L=>{const o=document.createElement('option');
 selLine.value=CUR.id;
 selLine.onchange=e=>{ initAudio(); switchLine(e.target.value); };
 
+$('appVer').textContent=APP_VERSION;
 buildDirSeg(); buildSelStart(); setDirLabel(); strip(); paint(); requestAnimationFrame(loop);
 </script>
 </body>
