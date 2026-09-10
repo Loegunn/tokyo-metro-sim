@@ -182,6 +182,10 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
 .note{padding:8px 18px 15px;font-size:10.5px;color:#8A9096;line-height:1.6;background:#F7F8F5}
 .note b{color:var(--uguisu-deep)}
 .bgHint{font-size:10px;color:#9AA09B}
+/* 「全部靜音」開咗嗰陣用返alert紅色，唔好同其他「開啟中」嘅綠色toggle
+   （例如運行中／背景播放）混淆——綠色喺呢個app代表「正常運作緊」，
+   但全部靜音係「刻意收晒聲」嘅狀態，用紅色先夠清楚分得出兩者唔同。 */
+#btnMuteAll[aria-pressed="true"]{background:var(--alert);border-color:var(--alert);color:#fff}
 .ver{padding:0 18px 8px;font-size:9.5px;color:#B7BCB2;background:#F7F8F5;text-align:right;
   letter-spacing:.04em;user-select:text}
 
@@ -281,7 +285,9 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
       <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.95"></div>
     <div class="grp"><span class="lbl">車廂聲</span>
       <input type="range" id="vol" min="0" max="1" step="0.05" value="0.4"></div>
-    <button id="btnVoice" aria-pressed="true">🔊 日＋英</button>
+    <button id="btnVoice" aria-pressed="true" title="淨係開／關日英報站，車廂聲唔受影響">🔊 日＋英</button>
+    <div class="grp"><span class="lbl">全部靜音</span>
+      <button id="btnMuteAll" aria-pressed="false" title="連車廂聲、路軌聲都一齊即刻收埋，唔止關報站；解除之後會跟返你原本嘅車廂聲音量同報站設定">關閉</button></div>
   </div>
   <div class="note" id="footnote">
     <b>開門方向</b>資料源自非官方鐵道部落格整理（内回り 30 站有多個來源互相印證；外回り 僅田端～田町段及澀谷站有確證），車站改建會令方向改變，僅供沉浸感參考，未確認嘅站會如實標示「未確認」而唔會亂估。
@@ -298,10 +304,11 @@ input[type=range]{width:88px;accent-color:var(--uguisu-deep);cursor:pointer}
    唯一source，介面顯示（#appVer）同交接文件都要對得住呢度。
    v1.0＝2026-09-10之前歷次交付嘅基準（冇正式版本號紀錄，追溯訂為
    v1.0）；v1.0.1＝暫停/跳站恢復漏播、倍速取消漏保護、行駛途中切
-   方向teleport 三個bug修正＋版本號系統本身；v1.1（呢一輪）＝加入
-   電腦背景播放（切換分頁後行程／車廂聲／報站繼續）＋乘客全螢幕
-   模式重新排版（置中、放大、停站時右側減少重複資訊）。 */
-const APP_VERSION='v1.1';
+   方向teleport 三個bug修正＋版本號系統本身；v1.1＝加入電腦背景
+   播放（切換分頁後行程／車廂聲／報站繼續）＋乘客全螢幕模式重新
+   排版（置中、放大、停站時右側減少重複資訊）；v1.2（呢一輪）＝
+   新增真正「全部靜音」按鈕（連車廂聲都一齊收埋，唔止關報站）。 */
+const APP_VERSION='v1.2';
 /* ═══ 駅データ：[JY番号,漢字,かな,ローマ字,のりかえ[],ドア[内回り,外回り]] ═══
    出典：内回り側は複数の鉄道系ブログの相互一致で採用。外回り側は
    田端～田町間（京浜東北線並走区間・両方向左側）と渋谷駅（改修後、両方向右側）
@@ -615,6 +622,16 @@ let annReq=0,voicedAnn=-1;
    停」。 */
 let bgPlayback=true;
 let bgTimerId=null,bgLast=0;
+/* masterMute（v1.2新增）：真正「全部靜音」——同舊有嘅voiceOn（淨係
+   關日英報站）唔同，開咗呢個會連車廂聲效（VVVF、路軌聲、rumble、
+   clack、開關門chime／air）都一齊即刻收埋，唔止靜咗把口。做法係
+   喺driveAudio()將sfx（成個音效graph嘅總gain node，所有效果都經
+   佢先出去）嘅目標音量逼做0，而唔係直接改voiceOn／vol嘅數值本身
+   ——咁樣解除全部靜音之後，車廂聲音量、日英報站呢兩個原本嘅設定
+   會自動還原，唔使你自己再撳返。voiceTick()同speak()都加咗呢個
+   flag做gate，同埋annReq/voicedAnn個機制令靜音期間錯過嘅報站，
+   解除之後會啱啱好補播返「現正」嗰句，唔會漏、唔會播舊嘢。 */
+let masterMute=false;
 const $=id=>document.getElementById(id);
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* 環狀路線（山手線）：一圈行晒 N 個站，wrap 返轉頭。
@@ -655,7 +672,7 @@ let rollSrc,rollFilt,rollGain,vvA,vvB,vvFilt,vvGain,rumbleGain,clackNext=0;
 
 function buildGraph(){
   if(built) return; built=true;
-  sfx=ac.createGain(); sfx.gain.value=vol; sfx.connect(ac.destination);
+  sfx=ac.createGain(); sfx.gain.value=masterMute?0:vol; sfx.connect(ac.destination);
   const len=Math.floor(ac.sampleRate*2);
   nBuf=ac.createBuffer(1,len,ac.sampleRate);
   const d=nBuf.getChannelData(0); let lp=0;
@@ -776,7 +793,7 @@ function clackPair(a0,amp,rf){
   noiseBurst(a0+.16*rf,.09,amp*.72,700,1.4); noiseBurst(a0+.215*rf,.11,amp*.58,400,1.2);
 }
 function scheduleClacks(){
-  if(!ac||ac.state!=='running'||v<.06||!running||(tabHidden&&!bgPlayback)) return;
+  if(!ac||ac.state!=='running'||v<.06||!running||(tabHidden&&!bgPlayback)||masterMute) return;
   const now=ac.currentTime;
   if(clackNext<now) clackNext=now+.03;
   const interval=(1.35/(0.18+v*1.5))/Math.max(speed,1);
@@ -803,7 +820,7 @@ function stopSpeech(){
   if(window.speechSynthesis) speechSynthesis.cancel();
 }
 function speak(list){
-  if(!voiceOn||!window.speechSynthesis) return;
+  if(!voiceOn||masterMute||!window.speechSynthesis) return;
   if(speed>1){
     /* 呢度cancel緊嘅嗰句舊utterance，個onend/onerror遲啲先到嘅話，
        如果冇bump genId，佢個myGen仲係啱嘅、會通過nextUtt()嘅代次
@@ -976,6 +993,7 @@ function voiceTick(){
   if(annReq===voicedAnn) return;
   if(!running) return;
   if(tabHidden&&!bgPlayback) return; // 背景播放開咗先可以喺收埋分頁時繼續出聲
+  if(masterMute) return; // 全部靜音期間keep住request pending，解除先補播返「現正」嗰句
   voicedAnn=annReq;
   const p=phase, n=at(idx+1);
   const tfCap=n.tf.slice(0,3), tfMore=n.tf.length>3;
@@ -1031,7 +1049,7 @@ function driveAudio(dt,p){
   accel=(v-vPrev)/Math.max(dt,1e-4);
   if(!ac||!sfx||ac.state!=='running') return;
   if(tabHidden&&!bgPlayback) return;
-  sfx.gain.value+=(vol-sfx.gain.value)*.1;
+  sfx.gain.value+=((masterMute?0:vol)-sfx.gain.value)*.1; // 全部靜音：目標音量逼做0，解除返自動還原vol
   const on=running?1:0;
   rollGain.gain.value+=((Math.pow(v,1.4)*.5*on)-rollGain.gain.value)*.08;
   rollFilt.frequency.value=220+v*900;
@@ -1185,8 +1203,24 @@ $('spdSeg').onclick=e=>{
 };
 $('btnVoice').onclick=e=>{
   voiceOn=!voiceOn; e.target.setAttribute('aria-pressed',voiceOn);
-  e.target.textContent=voiceOn?'🔊 日＋英':'🔇 靜音';
+  e.target.textContent=voiceOn?'🔊 日＋英':'🔇 靜音報站';
   if(!voiceOn) stopSpeech();
+};
+$('btnMuteAll').onclick=e=>{
+  /* 「全部靜音」：連車廂聲都一齊即刻收埋，同淨係關報站嘅btnVoice
+     唔同（唔好將呢兩粒掣搞混）。開咗即刻set sfx.gain.value=0，唔等
+     driveAudio()嗰個逐frame慢慢ramp（避免撳落去嗰下仲聽到一瞬間
+     殘留車廂聲）；亦即刻stopSpeech()cancel緊講緊嗰句、清空queue。
+     解除嗰陣乜都唔使做，driveAudio()自然會慢慢ramp返去你原本set
+     嘅vol／voiceOn設定，annReq/voicedAnn亦都會補播返「現正」嗰句
+     報站，唔會漏、唔會播錯咗舊嘢。 */
+  masterMute=!masterMute;
+  e.target.setAttribute('aria-pressed',masterMute);
+  e.target.textContent=masterMute?'開啟':'關閉';
+  if(masterMute){
+    if(sfx) sfx.gain.value=0;
+    stopSpeech();
+  }
 };
 $('rate').oninput=e=>rate=Number(e.target.value);
 $('vol').oninput=e=>vol=Number(e.target.value);
